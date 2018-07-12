@@ -6,7 +6,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/jawher/mow.cli"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
-	freenasProvisioner "github.com/nmaupu/freenas-provisioner/provisioner"
+	freenasProvisioner "github.com/travisghansen/freenas-iscsi-provisioner/provisioner"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -47,13 +47,13 @@ func Process(appName, appDesc, appVersion string) {
 	})
 	identifier = app.String(cli.StringOpt{
 		Name:   "i identifier",
-		Value:  "freenas-nfs-provisioner",
+		Value:  "freenas-iscsi-provisioner",
 		Desc:   "Provisioner identifier (e.g. if unsure set it to current node name)",
 		EnvVar: "IDENTIFIER",
 	})
 	provisionerName = app.String(cli.StringOpt{
 		Name:   "provisioner-name",
-		Value:  "freenas.org/nfs",
+		Value:  "freenas.org/iscsi",
 		Desc:   "Provisioner Name (e.g. 'provisioner' attribute of storage-class)",
 		EnvVar: "PROVISIONER_NAME",
 	})

@@ -1,4 +1,4 @@
-package: github.com/nmaupu/freenas-provisioner
+package: github.com/travisghansen/freenas-iscsi-provisioner
 import:
 - package: github.com/Sirupsen/logrus
   version: ^1.0.3

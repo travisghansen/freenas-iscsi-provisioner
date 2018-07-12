@@ -1,6 +1,6 @@
 BIN=bin
 
-IMAGE_NAME=freenas-provisioner
+IMAGE_NAME=freenas-iscsi-provisioner
 IMAGE_VERSION=2.0
 REMOTE_NAME=$(DOCKER_ID_USER)/$(IMAGE_NAME)
 
@@ -27,13 +27,13 @@ vendor:
 	glide install -v --strip-vcs
 
 $(BIN)/freenas-provisioner build: vendor $(BIN) $(shell find . -name "*.go")
-	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags '-extldflags "-static"' -o $(BIN)/freenas-provisioner .
+	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags '-extldflags "-static"' -o $(BIN)/freenas-iscsi-provisioner .
 
 darwin: vendor $(BIN) $(shell find . -name "*.go")
-	env CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -ldflags '-extldflags "-static"' -o $(BIN)/freenas-provisioner-darwin .
+	env CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -ldflags '-extldflags "-static"' -o $(BIN)/freenas-iscsi-provisioner-darwin .
 
 freebsd: vendor $(BIN) $(shell find . -name "*.go")
-	env CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -a -ldflags '-extldflags "-static"' -o $(BIN)/freenas-provisioner-freebsd .
+	env CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -a -ldflags '-extldflags "-static"' -o $(BIN)/freenas-iscsi-provisioner-freebsd .
 
 clean:
 	go clean -i

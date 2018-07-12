@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/nmaupu/freenas-provisioner/cli"
+	"github.com/travisghansen/freenas-iscsi-provisioner/cli"
 )
 
 const (
-	AppName = "freenas-provisioner"
-	AppDesc = "Kubernetes Freenas Provisioner (NFS)"
+	AppName = "freenas-iscsi-provisioner"
+	AppDesc = "Kubernetes FreeNAS Provisioner (iscsi)"
 )
 
 var (
