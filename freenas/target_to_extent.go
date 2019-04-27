@@ -14,7 +14,7 @@ var (
 type TargetToExtent struct {
 	Id     int `json:"id,omitempty"`
 	Extent int `json:"iscsi_extent,omitempty"`
-	Lunid  int `json:"iscsi_lunid,omitempty"`
+	Lunid  *int `json:"iscsi_lunid,omitempty"`
 	Target int `json:"iscsi_target,omitempty"`
 }
 
