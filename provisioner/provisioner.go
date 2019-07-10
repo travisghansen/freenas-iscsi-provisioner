@@ -27,7 +27,6 @@ type freenasProvisionerConfig struct {
 	ProvisionerTargetPortal             string
 	ProvisionerPortals                  string
 	ProvisionerEnableDeterministicNames bool
-	ProvisionerRetainPreExisting        bool
 	ProvisionerISCSINamePrefix          string
 	ProvisionerISCSINameSuffix          string
 	ProvisionerISCSIInterface           string
@@ -81,7 +80,6 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 	var provisionerTargetPortal string = ""
 	var provisionerPortals string = ""
 	var provisionerEnableDeterministicNames bool = true
-	var provisionerRetainPreExisting bool = true
 	var provisionerISCSINamePrefix string = ""
 	var provisionerISCSINameSuffix string = ""
 	var provisionerISCSIInterface string = "default"
@@ -135,11 +133,9 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 			provisionerPortals = v
 		case "provisionerEnableDeterministicNames":
 			provisionerEnableDeterministicNames, _ = strconv.ParseBool(v)
-		case "provisionerRetainPreExisting":
-			provisionerRetainPreExisting, _ = strconv.ParseBool(v)
 		case "provisionerISCSINamePrefix":
 			provisionerISCSINamePrefix = v
-		case "provisionerISCSINameSUffix":
+		case "provisionerISCSINameSuffix":
 			provisionerISCSINameSuffix = v
 		case "provisionerISCSIInterface":
 			provisionerISCSIInterface = v
@@ -230,7 +226,6 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 		ProvisionerTargetPortal:             provisionerTargetPortal,
 		ProvisionerPortals:                  provisionerPortals,
 		ProvisionerEnableDeterministicNames: provisionerEnableDeterministicNames,
-		ProvisionerRetainPreExisting:        provisionerRetainPreExisting,
 		ProvisionerISCSINamePrefix:          provisionerISCSINamePrefix,
 		ProvisionerISCSINameSuffix:          provisionerISCSINameSuffix,
 		ProvisionerISCSIInterface:           provisionerISCSIInterface,
@@ -460,9 +455,10 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	}
 
 	// Create targettoextent
+	lunid := 0
 	targetToExtent := freenas.TargetToExtent{
 		Extent: extent.Id,
-		Lunid:  0,
+		Lunid:  &lunid,
 		Target: target.Id,
 	}
 	err = targetToExtent.Create(freenasServer)
@@ -484,7 +480,6 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
 			Annotations: map[string]string{
-				//"datasetPreExisted":               strconv.FormatBool(datasetPreExisted),
 				"freenasISCSIProvisionerIdentity": p.Identifier,
 				"datasetParent":                   config.DatasetParentName,
 				"pool":                            parentDs.Pool,
@@ -540,8 +535,6 @@ func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
 	zvolName = volume.Annotations["zvol"]
 	iscsiName = volume.Annotations["iscsiName"]
 	datasetParentName = volume.Annotations["datasetParent"]
-
-	//datasetPreExisted, _ = strconv.ParseBool(datasetPreExistedAnnotation)
 
 	var err error
 

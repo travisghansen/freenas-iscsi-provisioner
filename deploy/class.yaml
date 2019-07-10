@@ -6,7 +6,7 @@ metadata:
 #  annotations:
 #    storageclass.kubernetes.io/is-default-class: "true"
 provisioner: freenas.org/iscsi
-allowVolumeExpansion: true
+allowVolumeExpansion: false
 parameters:
   # set the default filesystem
   # default: ext4
@@ -49,13 +49,6 @@ parameters:
   # if disabled zvol will be <datasetParentName>/<PV Name> (PV Name is 'pvc-<guid>')
   # default: true
   #provisionerEnableDeterministicNames:
-
-  # if enabled and datasetDeterministicNames is enabled then resource that
-  # already exist (pre-povisioned out of band) will be ratained by the
-  # provisioner during deletion of the reclaim process
-  # ignored if provisionerEnableDeterministicNames is disabled (collisions result in failure)
-  # default: true
-  #provisionerRetainPreExisting:
 
   # adds the desired prefix to targets and extents
   # example: somecluster.foo.

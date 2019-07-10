@@ -22,7 +22,7 @@ the credentials and host information used to communicate with with FreeNAS API.
 In essence each `Secret` corresponds to a FreeNAS server.
 
 The `Secret` namespace and name may be customized using the appropriate
-`StorageClass` `parameters`.  By default `kube-system` and `freenas-nfs` are
+`StorageClass` `parameters`.  By default `kube-system` and `freenas-iscsi` are
 used.  While multiple `StorageClass` resources may point to the same server
 and hence same `Secret`, it is recommended to create a new `Secret` for each
 `StorageClass` resource.
