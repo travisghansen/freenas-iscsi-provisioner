@@ -1,6 +1,6 @@
 language: go
 go:
-- '1.12'
+- '1.8'
 sudo: required
 services:
 - docker
@@ -46,4 +46,4 @@ deploy:
   skip_cleanup: true
   on:
     tags: true
-  go: 1.12
+  go: 1.8
