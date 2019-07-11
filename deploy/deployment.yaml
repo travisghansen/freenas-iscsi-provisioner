@@ -15,7 +15,7 @@ spec:
     spec:
       serviceAccountName: freenas-iscsi-provisioner
       containers:
-        - name: freenas-nfs-provisioner
+        - name: freenas-iscsi-provisioner
           image: docker.io/travisghansen/freenas-iscsi-provisioner:latest
           env:
             #- name: IDENTIFIER
