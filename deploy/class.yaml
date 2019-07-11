@@ -22,14 +22,11 @@ parameters:
   
   # the name of the parent dataset (or simply pool) where all resources will
   # be created, it *must* exist before provisioner will work
+  # Note: due to length limitations with iscsi the total string length must
+  # NOT exceed 22 chars (this includes slashes etc)
   # example: tank/k8s/mycluster
   # default: tank
   #datasetParentName:
-  
-  # if enabled provisioner will create parent datasets for each namespace
-  # otherwise, all datasets will be provisioned in a flat manner
-  # default: true
-  #datasetEnableNamespaces:
   
   # portal details
   # example: server:3260
@@ -40,15 +37,6 @@ parameters:
   # example: server2:3260,server3:3260
   # default:
   #provisionerPortals:
-
-  # if enabled created iscsi and zvol resources will adhere to reliable pattern
-  # if enabled iscsi targets and extents will be <prefix><namespace>-<PVC Name><suffix>
-  # if disabled iscsi targets and extents will be <prefix><PV Name><suffix> (PV Name is 'pvc-<guid>')
-  # if datasetNamespaces == true zvol pattern is: <datasetParentName>/<namespace>/<PVC Name>
-  # if datasetNamespaces == false zvol pattern is: <datasetParentName>/<namespace>-<PVC Name>
-  # if disabled zvol will be <datasetParentName>/<PV Name> (PV Name is 'pvc-<guid>')
-  # default: true
-  #provisionerEnableDeterministicNames:
 
   # adds the desired prefix to targets and extents
   # example: somecluster.foo.

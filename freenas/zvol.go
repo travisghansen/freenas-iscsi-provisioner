@@ -47,7 +47,7 @@ func (z *Zvol) CopyFrom(source FreenasResource) error {
 }
 
 func (z *Zvol) Get(server *FreenasServer) error {
-	endpoint := fmt.Sprintf("/api/v1.0/storage/volume/%s/zvols/%s", z.Dataset.Pool, z.Name)
+	endpoint := fmt.Sprintf("/api/v1.0/storage/volume/%s/zvols/%s/", z.Dataset.Pool, z.Name)
 	var zvol Zvol
 	resp, err := server.getSlingConnection().Get(endpoint).ReceiveSuccess(&zvol)
 	if err != nil {

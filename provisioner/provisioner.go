@@ -1,17 +1,17 @@
 package provisioner
 
 import (
-	//"errors"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/travisghansen/freenas-iscsi-provisioner/freenas"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/pkg/api/v1"
-	"path/filepath"
-	"strconv"
-	"strings"
+	v1 "k8s.io/client-go/pkg/api/v1"
 )
 
 var (
@@ -24,16 +24,14 @@ type freenasProvisionerConfig struct {
 	FSType string
 
 	// Provisioner options
-	ProvisionerTargetPortal             string
-	ProvisionerPortals                  string
-	ProvisionerEnableDeterministicNames bool
-	ProvisionerISCSINamePrefix          string
-	ProvisionerISCSINameSuffix          string
-	ProvisionerISCSIInterface           string
+	ProvisionerTargetPortal    string
+	ProvisionerPortals         string
+	ProvisionerISCSINamePrefix string
+	ProvisionerISCSINameSuffix string
+	ProvisionerISCSIInterface  string
 
 	// Dataset options
-	DatasetParentName       string
-	DatasetEnableNamespaces bool
+	DatasetParentName string
 
 	// TargetGroup options
 	TargetGroupAuthgroup      int
@@ -74,51 +72,49 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 		return nil, err
 	}
 
-	var fsType string = "ext4"
+	var fsType = "ext4"
 
 	// provisioner defaults
-	var provisionerTargetPortal string = ""
-	var provisionerPortals string = ""
-	var provisionerEnableDeterministicNames bool = true
-	var provisionerISCSINamePrefix string = ""
-	var provisionerISCSINameSuffix string = ""
-	var provisionerISCSIInterface string = "default"
+	var provisionerTargetPortal string
+	var provisionerPortals string
+	var provisionerISCSINamePrefix string
+	var provisionerISCSINameSuffix string
+	var provisionerISCSIInterface = "default"
 
 	// dataset defaults
-	var datasetParentName string = "tank"
-	var datasetEnableNamespaces bool = true
+	var datasetParentName = "tank"
 
 	// targetGroup defaults
 	var targetGroupAuthgroup int
-	var targetGroupAuthtype string = "None"
+	var targetGroupAuthtype = "None"
 	var targetGroupInitiatorgroup int
 	var targetGroupPortalgroup int
 
 	// zvol defaults
-	var zvolCompression string = ""
-	var zvolDedup string = ""
-	var zvolSparse bool = true
-	var zvolForce bool = false
-	var zvolBlocksize string = ""
+	var zvolCompression string
+	var zvolDedup string
+	var zvolSparse = true
+	var zvolForce = false
+	var zvolBlocksize string
 
 	// extent defaults
-	var extentBlocksize int = 0
-	var extentDisablePhysicalBlocksize bool = true
-	var extentAvailThreshold int = 0
-	var extentInsecureTpc bool = true
-	var extentXen bool = false
-	var extentRpm string = ""
-	var extentReadOnly bool = false
+	var extentBlocksize int
+	var extentDisablePhysicalBlocksize = true
+	var extentAvailThreshold int
+	var extentInsecureTpc = true
+	var extentXen = false
+	var extentRpm string
+	var extentReadOnly = false
 
 	// server options
-	var serverSecretNamespace string = "kube-system"
-	var serverSecretName string = "freenas-iscsi"
-	var serverProtocol string = "http"
-	var serverHost string = "localhost"
-	var serverPort int = 80
-	var serverUsername string = "root"
-	var serverPassword string = ""
-	var serverAllowInsecure bool = false
+	var serverSecretNamespace = "kube-system"
+	var serverSecretName = "freenas-iscsi"
+	var serverProtocol = "http"
+	var serverHost = "localhost"
+	var serverPort = 80
+	var serverUsername = "root"
+	var serverPassword string
+	var serverAllowInsecure = false
 
 	// set values from StorageClass parameters
 	for k, v := range class.Parameters {
@@ -131,8 +127,6 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 			provisionerTargetPortal = v
 		case "provisionerPortals":
 			provisionerPortals = v
-		case "provisionerEnableDeterministicNames":
-			provisionerEnableDeterministicNames, _ = strconv.ParseBool(v)
 		case "provisionerISCSINamePrefix":
 			provisionerISCSINamePrefix = v
 		case "provisionerISCSINameSuffix":
@@ -143,8 +137,6 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 		// Dataset options
 		case "datasetParentName":
 			datasetParentName = v
-		case "datasetEnableNamespaces":
-			datasetEnableNamespaces, _ = strconv.ParseBool(v)
 
 		// TargetGroup options
 		case "targetGroupAuthgroup":
@@ -223,16 +215,14 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 		FSType: fsType,
 
 		// Provisioner options
-		ProvisionerTargetPortal:             provisionerTargetPortal,
-		ProvisionerPortals:                  provisionerPortals,
-		ProvisionerEnableDeterministicNames: provisionerEnableDeterministicNames,
-		ProvisionerISCSINamePrefix:          provisionerISCSINamePrefix,
-		ProvisionerISCSINameSuffix:          provisionerISCSINameSuffix,
-		ProvisionerISCSIInterface:           provisionerISCSIInterface,
+		ProvisionerTargetPortal:    provisionerTargetPortal,
+		ProvisionerPortals:         provisionerPortals,
+		ProvisionerISCSINamePrefix: provisionerISCSINamePrefix,
+		ProvisionerISCSINameSuffix: provisionerISCSINameSuffix,
+		ProvisionerISCSIInterface:  provisionerISCSIInterface,
 
 		// Dataset options
-		DatasetParentName:       datasetParentName,
-		DatasetEnableNamespaces: datasetEnableNamespaces,
+		DatasetParentName: datasetParentName,
 
 		// TargetGroup options
 		TargetGroupAuthgroup:      targetGroupAuthgroup,
@@ -273,6 +263,7 @@ type freenasProvisioner struct {
 	Identifier string
 }
 
+// New creates a new client instance
 func New(client kubernetes.Interface, identifier string) controller.Provisioner {
 	return &freenasProvisioner{
 		Client:     client,
@@ -280,6 +271,7 @@ func New(client kubernetes.Interface, identifier string) controller.Provisioner 
 	}
 }
 
+// AccessModesContains checks if mode is available
 func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
@@ -289,6 +281,7 @@ func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.Persiste
 	return false
 }
 
+// AccessModesContainedInAll ensures all access modes are available
 func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
 	for _, mode := range requestedModes {
 		if !AccessModesContains(indexedModes, mode) {
@@ -342,44 +335,43 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	}
 
 	meta := options.PVC.GetObjectMeta()
+	pvcNamespace := meta.GetNamespace()
+	pvcName := meta.GetName()
 	zvolName := options.PVName
 	iscsiName := options.PVName
-	dsNamespace := ""
-
-	if config.DatasetEnableNamespaces {
-		dsNamespace = meta.GetNamespace()
-	}
-
-	if config.ProvisionerEnableDeterministicNames {
-		iscsiName = meta.GetNamespace() + "-" + meta.GetName()
-		if config.DatasetEnableNamespaces {
-			zvolName = meta.GetNamespace() + "/" + meta.GetName()
-		} else {
-			zvolName = meta.GetNamespace() + "-" + meta.GetName()
-		}
-	}
 
 	zvolName = strings.TrimPrefix(parentDs.Name, parentDs.Pool+"/") + "/" + zvolName
 	iscsiName = config.ProvisionerISCSINamePrefix + iscsiName + config.ProvisionerISCSINameSuffix
+	extentDiskName := "zvol/" + parentDs.Pool + "/" + zvolName
+
+	if len(extentDiskName) > 63 {
+		return nil, fmt.Errorf("extent zvol name (%s) cannot be longer than 63 chars", extentDiskName)
+	}
+
+	if len(zvolName) < 1 {
+		return nil, fmt.Errorf("zvol name cannot be empty")
+	}
 
 	glog.Infof("Creating target: \"%s\", zvol: \"%s/%s\", extent: \"%s\", ", iscsiName, parentDs.Pool, zvolName, iscsiName)
 
-	// Create namepsace dataset if desired
-	if config.DatasetEnableNamespaces {
-		nsDs := freenas.Dataset{
-			Pool:     parentDs.Pool,
-			Name:     filepath.Join(parentDs.Name, dsNamespace),
-			Comments: "k8s provisioned namespace",
-		}
+	// Create zvol
+	var zvolVolsize int64
+	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	zvolVolsize = volSize.Value()
+	zvolVolsizeGB := (float64(zvolVolsize) / 1024 / 1024 / 1024)
 
-		err = nsDs.Get(freenasServer)
-		if err != nil {
-			glog.Infof("creating namespace dataset \"%s\"", nsDs.Name)
-			err = nsDs.Create(freenasServer)
-		} else {
-			glog.Infof("namespace dataset \"%s\" already exists", nsDs.Name)
-		}
+	zvol := freenas.Zvol{
+		Name:        zvolName,
+		Comments:    TruncateString(fmt.Sprintf("%s/%s/%s", meta.GetClusterName(), pvcNamespace, pvcName), 1024),
+		Compression: config.ZvolCompression, // config - "" (inherit), lz4, gzip-9, etc
+		Dedup:       config.ZvolDedup,       // config - nil (inherit), on, off, verify
+		Volsize:     strconv.FormatFloat(zvolVolsizeGB, 'f', -1, 64) + " GiB",
+		Sparse:      config.ZvolSparse,
+		Force:       config.ZvolForce,
+		Blocksize:   config.ZvolBlocksize, // config - 512, 1K, 2K, 4K, 8K, 16K, 32K, 64K, 128K
+		Dataset:     parentDs,
 	}
+	err = zvol.Create(freenasServer)
 	if err != nil {
 		return nil, err
 	}
@@ -392,6 +384,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	}
 	err = target.Create(freenasServer)
 	if err != nil {
+		zvol.Delete(freenasServer)
 		return nil, err
 	}
 
@@ -407,51 +400,45 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	err = targetGroup.Create(freenasServer)
 	if err != nil {
 		target.Delete(freenasServer)
-		return nil, err
-	}
-
-	// Create zvol
-	var zvolVolsize int64 = 0
-	volSize := options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	zvolVolsize = volSize.Value()
-	zvolVolsizeGB := (float64(zvolVolsize) / 1024 / 1024 / 1024)
-
-	zvol := freenas.Zvol{
-		Name:        zvolName,
-		Comments:    "comments",
-		Compression: config.ZvolCompression, // config - "" (inherit), lz4, gzip-9, etc
-		Dedup:       config.ZvolDedup,       // config - nil (inherit), on, off, verify
-		Volsize:     strconv.FormatFloat(zvolVolsizeGB, 'f', -1, 64) + " GiB",
-		Sparse:      config.ZvolSparse,
-		Force:       config.ZvolForce,
-		Blocksize:   config.ZvolBlocksize, // config - 512, 1K, 2K, 4K, 8K, 16K, 32K, 64K, 128K
-		Dataset:     parentDs,
-	}
-	err = zvol.Create(freenasServer)
-	if err != nil {
-		target.Delete(freenasServer)
+		zvol.Delete(freenasServer)
 		return nil, err
 	}
 
 	// Create extent
+	// whole path to zvol Disk including "zvol/" must be <= 63 chars
 	extent := freenas.Extent{
 		Name:           iscsiName,
 		Type:           "Disk",
-		Disk:           "zvol/" + parentDs.Pool + "/" + zvol.Name,
+		Disk:           extentDiskName,
 		Blocksize:      config.ExtentBlocksize, //config - 512, 1024, 2048, or 4096
 		Pblocksize:     config.ExtentDisablePhysicalBlocksize,
 		AvailThreshold: config.ExtentAvailThreshold,
-		Comment:        "some comments",
+		Comment:        TruncateString(fmt.Sprintf("%s/%s", pvcNamespace, pvcName), 120),
 		InsecureTpc:    config.ExtentInsecureTpc,
 		Xen:            config.ExtentXen,
 		Rpm:            config.ExtentRpm, // config - Unknown, SSD, 5400, 7200, 10000, 15000
 		Ro:             config.ExtentReadOnly,
 	}
-	err = extent.Create(freenasServer)
-	if err != nil {
-		zvol.Delete(freenasServer)
-		target.Delete(freenasServer)
-		return nil, err
+
+	// run this as a loop as zvol creation returns a 202 and may take a little time to complete
+	extentLoopCurrent := 0
+	extentMaxLoops := 2
+	extentWaitDuration, err := time.ParseDuration("5s")
+	for {
+		err = extent.Create(freenasServer)
+		if err != nil {
+
+			if extentMaxLoops == extentLoopCurrent {
+				targetGroup.Delete(freenasServer)
+				target.Delete(freenasServer)
+				zvol.Delete(freenasServer)
+				return nil, err
+			}
+			extentLoopCurrent++
+			time.Sleep(extentWaitDuration)
+		} else {
+			break
+		}
 	}
 
 	// Create targettoextent
@@ -464,8 +451,9 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	err = targetToExtent.Create(freenasServer)
 	if err != nil {
 		extent.Delete(freenasServer)
-		zvol.Delete(freenasServer)
+		targetGroup.Delete(freenasServer)
 		target.Delete(freenasServer)
+		zvol.Delete(freenasServer)
 		return nil, err
 	}
 
@@ -474,7 +462,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		portals = strings.Split(config.ProvisionerPortals, ",")
 	}
 
-	var lun int32 = 0
+	var lun int32
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -518,23 +506,43 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 }
 
 func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
-	var targetId, extentId int
+	var targetID, extentID int
 	var poolName, zvolName, iscsiName, datasetParentName string
 
-	targetIdAnnotation, ok := volume.Annotations["targetId"]
+	targetIDAnnotation, ok := volume.Annotations["targetId"]
 	if ok {
-		targetId, _ = strconv.Atoi(targetIdAnnotation)
+		targetID, _ = strconv.Atoi(targetIDAnnotation)
 	}
 
-	extentIdAnnotation, ok := volume.Annotations["extentId"]
+	extentIDAnnotation, ok := volume.Annotations["extentId"]
 	if ok {
-		extentId, _ = strconv.Atoi(extentIdAnnotation)
+		extentID, _ = strconv.Atoi(extentIDAnnotation)
 	}
 
 	poolName = volume.Annotations["pool"]
 	zvolName = volume.Annotations["zvol"]
 	iscsiName = volume.Annotations["iscsiName"]
 	datasetParentName = volume.Annotations["datasetParent"]
+
+	if len(targetIDAnnotation) < 1 {
+		return fmt.Errorf("targetID cannot be empty")
+	}
+
+	if len(extentIDAnnotation) < 1 {
+		return fmt.Errorf("extentID cannot be empty")
+	}
+
+	if len(poolName) < 1 {
+		return fmt.Errorf("poolName cannot be empty")
+	}
+
+	if len(zvolName) < 1 {
+		return fmt.Errorf("zvolName cannot be empty")
+	}
+
+	if len(datasetParentName) < 1 {
+		return fmt.Errorf("datasetParentName cannot be empty")
+	}
 
 	var err error
 
@@ -560,27 +568,36 @@ func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
 		return err
 	}
 
-	glog.Infof("Deleting target: %d (\"%s\"), extent: %d (\"%s\"), zvol: \"%s/%s\"", targetId, iscsiName, extentId, iscsiName, poolName, zvolName)
+	glog.Infof("Deleting target: %d (\"%s\"), extent: %d (\"%s\"), zvol: \"%s/%s\"", targetID, iscsiName, extentID, iscsiName, poolName, zvolName)
 
 	// Delete target
 	// NOTE: deletting a target inherently deletes associated targetgroup(s) and targettoextent(s)
 	target := freenas.Target{
-		Id: targetId,
+		Id: targetID,
 	}
-	target.Delete(freenasServer)
+	err = target.Delete(freenasServer)
+	if err != nil {
+		return err
+	}
 
 	// Delete extent
 	extent := freenas.Extent{
-		Id: extentId,
+		Id: extentID,
 	}
-	extent.Delete(freenasServer)
+	err = extent.Delete(freenasServer)
+	if err != nil {
+		return err
+	}
 
 	// Delete zvol
 	zvol := freenas.Zvol{
 		Name:    zvolName,
 		Dataset: parentDs,
 	}
-	zvol.Delete(freenasServer)
+	err = zvol.Delete(freenasServer)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -600,8 +617,18 @@ func (p *freenasProvisioner) GetSecret(namespace, secretName string) (*v1.Secret
 	return p.Client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
 }
 
+// BytesToString converts bytes to a string
 func BytesToString(data []byte) string {
 	return string(data[:])
+}
+
+// TruncateString removes all chars from a string after num chars
+func TruncateString(str string, num int) string {
+	bnoden := str
+	if len(str) > num {
+		bnoden = str[:num]
+	}
+	return bnoden
 }
 
 // Prep for resizing

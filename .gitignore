@@ -18,3 +18,5 @@
 bin/
 vendor/
 tmp/
+bin_release/
+manifests/

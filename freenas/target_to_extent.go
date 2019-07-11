@@ -3,8 +3,9 @@ package freenas
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
+
+	"github.com/golang/glog"
 )
 
 var (
