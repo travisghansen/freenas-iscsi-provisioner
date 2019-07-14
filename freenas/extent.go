@@ -1,18 +1,22 @@
 package freenas
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
+	"net/http"
+
+	"github.com/golang/glog"
 )
 
 var (
-	_ FreenasResource = &Extent{}
+	_ Resource = &Extent{}
 )
 
+// Extent represents an ISCSI extent
 type Extent struct {
-	Id             int    `json:"id,omitempty"`
+	ID             int    `json:"id,omitempty"`
 	AvailThreshold int    `json:"iscsi_target_extent_avail_threshold,omitempty"`
 	Blocksize      int    `json:"iscsi_target_extent_blocksize,omitempty"`
 	Comment        string `json:"iscsi_target_extent_comment,omitempty"`
@@ -31,10 +35,11 @@ type Extent struct {
 	Xen            bool   `json:"iscsi_target_extent_xen,omitempty"`
 }
 
-func (e *Extent) CopyFrom(source FreenasResource) error {
+// CopyFrom copies data from a response into an existing resource instance
+func (e *Extent) CopyFrom(source Resource) error {
 	src, ok := source.(*Extent)
 	if ok {
-		e.Id = src.Id
+		e.ID = src.ID
 		e.AvailThreshold = src.AvailThreshold
 		e.Blocksize = src.Blocksize
 		e.Comment = src.Comment
@@ -55,46 +60,83 @@ func (e *Extent) CopyFrom(source FreenasResource) error {
 	return errors.New("Cannot copy, src is not a Extent")
 }
 
-func (e *Extent) Get(server *FreenasServer) error {
-	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/extent/%d/", e.Id)
-	var extent Extent
-	resp, err := server.getSlingConnection().Get(endpoint).ReceiveSuccess(&extent)
-	if err != nil {
-		glog.Warningln(err)
-		return err
+// Get gets an Extent instance
+func (e *Extent) Get(server *Server) (*http.Response, error) {
+	if e.ID > 0 {
+		endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/extent/%d/", e.ID)
+		var extent Extent
+		resp, err := server.getSlingConnection().Get(endpoint).ReceiveSuccess(&extent)
+		if err != nil {
+			glog.Warningln(err)
+			return resp, err
+		}
+
+		e.CopyFrom(&extent)
+
+		return resp, nil
 	}
-	defer resp.Body.Close()
 
-	e.CopyFrom(&extent)
+	// find by name
+	if len(e.Name) > 0 {
+		endpoint := "/api/v1.0/services/iscsi/extent/?limit=1000"
+		var list []Extent
+		var es interface{}
+		resp, err := server.getSlingConnection().Get(endpoint).Receive(&list, &es)
 
-	return nil
+		if err != nil {
+			glog.Warningln(err)
+			return nil, err
+		}
+
+		if resp.StatusCode != 200 {
+			body, _ := json.Marshal(es)
+			return resp, fmt.Errorf("Error getting Extent \"%s\" - message: %v, status: %d", e.Name, string(body), resp.StatusCode)
+		}
+
+		for _, item := range list {
+			if item.Name == e.Name {
+				e.CopyFrom(&item)
+				glog.Infof("found Extent name: %s - %+v", e.Name, *e)
+				return resp, nil
+			}
+		}
+	}
+
+	// Nothing found
+	return nil, errors.New("no Extent has been found")
 }
 
-func (e *Extent) Create(server *FreenasServer) error {
+// Create creates an Extent instance
+func (e *Extent) Create(server *Server) (*http.Response, error) {
 	endpoint := "/api/v1.0/services/iscsi/extent/"
 	var extent Extent
 	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(e).Receive(&extent, nil)
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return errors.New(fmt.Sprintf("Error creating extent for %+v - %v", *e, body))
+		return resp, fmt.Errorf("Error creating extent for %+v - %v", *e, body)
 	}
 
 	e.CopyFrom(&extent)
 
-	return nil
+	return resp, nil
 }
 
-func (e *Extent) Delete(server *FreenasServer) error {
-	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/extent/%d/", e.Id)
-	_, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
+// Delete deletes an Extent instance
+func (e *Extent) Delete(server *Server) (*http.Response, error) {
+	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/extent/%d/", e.ID)
+	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
 	if err != nil {
 		glog.Warningln(err)
 	}
-	return err
+
+	if resp.StatusCode != 204 {
+		return resp, fmt.Errorf("Error deleting Extent: %d", resp.StatusCode)
+	}
+
+	return resp, nil
 }

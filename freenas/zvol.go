@@ -3,14 +3,16 @@ package freenas
 import (
 	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/golang/glog"
-	"io/ioutil"
 )
 
 var (
-	_ FreenasResource = &Zvol{}
+	_ Resource = &Zvol{}
 )
 
+// Zvol represents a zvol instance
 type Zvol struct {
 	Name        string `json:"name,omitempty"`
 	Avail       int64  `json:"avail,omitempty"`
@@ -27,7 +29,8 @@ type Zvol struct {
 	Dataset   Dataset `json:"-"`
 }
 
-func (z *Zvol) CopyFrom(source FreenasResource) error {
+// CopyFrom copies data from a response into an existing resource instance
+func (z *Zvol) CopyFrom(source Resource) error {
 	src, ok := source.(*Zvol)
 	if ok {
 		z.Name = src.Name
@@ -46,46 +49,62 @@ func (z *Zvol) CopyFrom(source FreenasResource) error {
 	return errors.New("Cannot copy, src is not a Zvol")
 }
 
-func (z *Zvol) Get(server *FreenasServer) error {
+// Get gets a Zvol instance
+func (z *Zvol) Get(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/storage/volume/%s/zvols/%s/", z.Dataset.Pool, z.Name)
 	var zvol Zvol
 	resp, err := server.getSlingConnection().Get(endpoint).ReceiveSuccess(&zvol)
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return resp, err
 	}
-	defer resp.Body.Close()
 
 	z.CopyFrom(&zvol)
 
-	return nil
+	return resp, nil
 }
 
-func (z *Zvol) Create(server *FreenasServer) error {
+// Create creates a Zvol instance
+func (z *Zvol) Create(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/storage/volume/%s/zvols/", z.Dataset.Pool)
 	//var zvol Zvol
-	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(z).Receive(nil, nil)
+
+	er := new(ErrorResponse)
+	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(z).Receive(nil, er)
+
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return resp, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 202 {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return errors.New(fmt.Sprintf("Error creating zvol for %+v - %v", *z, body))
+		//return resp, fmt.Errorf("Error creating zvol for %+v - %s", *z, responseString)
+		return resp, fmt.Errorf("Error creating zvol for %+v - %+v - %s", *z, *er, er.DefaultAll[0])
 	}
 
 	//z.CopyFrom(&zvol)
 
-	return nil
+	return resp, nil
 }
 
-func (z *Zvol) Delete(server *FreenasServer) error {
+// Delete deletes a Zvol instance
+func (z *Zvol) Delete(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/storage/volume/%s/zvols/%s/", z.Dataset.Pool, z.Name)
-	_, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
+
+	var e string
+	type DeleteBody struct {
+		Cascade bool `json:"cascade"`
+	}
+	var b = new(DeleteBody)
+	b.Cascade = true
+	resp, err := server.getSlingConnection().Delete(endpoint).BodyJSON(b).Receive(nil, &e)
 	if err != nil {
 		glog.Warningln(err)
 	}
-	return err
+
+	if resp.StatusCode != 204 {
+		return resp, fmt.Errorf("Error deleting Zvol: %d %s", resp.StatusCode, e)
+	}
+
+	return resp, nil
 }

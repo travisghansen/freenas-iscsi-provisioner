@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -9,9 +10,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/travisghansen/freenas-iscsi-provisioner/freenas"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/pkg/api/v1"
 )
 
 var (
@@ -304,6 +305,14 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	}
 
 	var err error
+	var resp *http.Response
+
+	var loopErr error
+	var loopResp *http.Response
+
+	if resp != nil && resp.StatusCode == 200 {
+		glog.Infof("stuff and stuff")
+	}
 
 	// get config
 	config, err := p.GetConfig(*options.PVC.Spec.StorageClassName)
@@ -320,7 +329,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 
 	// get iscsi configuration
 	iscsiConfig := freenas.ISCSIConfig{}
-	err = iscsiConfig.Get(freenasServer)
+	resp, err = iscsiConfig.Get(freenasServer)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +338,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	parentDs := freenas.Dataset{
 		Name: config.DatasetParentName,
 	}
-	err = parentDs.Get(freenasServer)
+	resp, err = parentDs.Get(freenasServer)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +361,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		return nil, fmt.Errorf("zvol name cannot be empty")
 	}
 
-	glog.Infof("Creating target: \"%s\", zvol: \"%s/%s\", extent: \"%s\", ", iscsiName, parentDs.Pool, zvolName, iscsiName)
+	glog.Infof("Creating target: \"%s\", zvol: \"%s/%s\", extent: \"%s\"", iscsiName, parentDs.Pool, zvolName, iscsiName)
 
 	// Create zvol
 	var zvolVolsize int64
@@ -371,9 +380,14 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		Blocksize:   config.ZvolBlocksize, // config - 512, 1K, 2K, 4K, 8K, 16K, 32K, 64K, 128K
 		Dataset:     parentDs,
 	}
-	err = zvol.Create(freenasServer)
+	resp, err = zvol.Create(freenasServer)
 	if err != nil {
-		return nil, err
+		//glog.Infof("zvol error %s", err.Error())
+		if resp.StatusCode == 400 && strings.Contains(err.Error(), "dataset already exists") {
+			//zvol.Get(freenasServer)
+		} else {
+			return nil, err
+		}
 	}
 
 	// Create target
@@ -382,26 +396,43 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		Alias: "",
 		Mode:  "iscsi",
 	}
-	err = target.Create(freenasServer)
+	resp, err = target.Create(freenasServer)
 	if err != nil {
-		zvol.Delete(freenasServer)
-		return nil, err
+		// already exists
+		if resp.StatusCode != 409 {
+			zvol.Delete(freenasServer)
+			return nil, err
+		} else {
+			target.Get(freenasServer)
+		}
 	}
 
 	// Create targetgroup(s)
 	targetGroup := freenas.TargetGroup{
-		Target:         target.Id,
+		Target:         target.ID,
 		Authgroup:      config.TargetGroupAuthgroup,
 		Authtype:       config.TargetGroupAuthtype,
 		Initialdigest:  "Auto",
 		Initiatorgroup: config.TargetGroupInitiatorgroup,
 		Portalgroup:    config.TargetGroupPortalgroup,
 	}
-	err = targetGroup.Create(freenasServer)
+	resp, err = targetGroup.Create(freenasServer)
 	if err != nil {
-		target.Delete(freenasServer)
-		zvol.Delete(freenasServer)
-		return nil, err
+		// cope with craziness
+		if resp.StatusCode == 404 {
+			loopResp, loopErr = targetGroup.Get(freenasServer)
+			if loopErr != nil || loopResp.StatusCode != 200 {
+				glog.Infof("failed attempt to create TargetGroup %d", resp.StatusCode)
+				target.Delete(freenasServer)
+				zvol.Delete(freenasServer)
+				return nil, err
+			}
+		} else if resp.StatusCode != 409 {
+			glog.Infof("failed attempt to create TargetGroup %d", resp.StatusCode)
+			target.Delete(freenasServer)
+			zvol.Delete(freenasServer)
+			return nil, err
+		}
 	}
 
 	// Create extent
@@ -425,8 +456,19 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	extentMaxLoops := 2
 	extentWaitDuration, err := time.ParseDuration("5s")
 	for {
-		err = extent.Create(freenasServer)
+		resp, err = extent.Create(freenasServer)
 		if err != nil {
+			if resp.StatusCode == 409 {
+				loopResp, loopErr = extent.Get(freenasServer)
+				if loopErr != nil {
+					glog.Infof("failed attempt to create Extent %d", resp.StatusCode)
+					targetGroup.Delete(freenasServer)
+					target.Delete(freenasServer)
+					zvol.Delete(freenasServer)
+					return nil, err
+				}
+				break
+			}
 
 			if extentMaxLoops == extentLoopCurrent {
 				targetGroup.Delete(freenasServer)
@@ -444,26 +486,42 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	// Create targettoextent
 	lunid := 0
 	targetToExtent := freenas.TargetToExtent{
-		Extent: extent.Id,
+		Extent: extent.ID,
 		Lunid:  &lunid,
-		Target: target.Id,
+		Target: target.ID,
 	}
-	err = targetToExtent.Create(freenasServer)
+	resp, err = targetToExtent.Create(freenasServer)
 	if err != nil {
-		extent.Delete(freenasServer)
-		targetGroup.Delete(freenasServer)
-		target.Delete(freenasServer)
-		zvol.Delete(freenasServer)
-		return nil, err
+		if resp.StatusCode == 409 {
+			loopResp, loopErr = targetToExtent.Get(freenasServer)
+			if loopErr != nil {
+				glog.Infof("failed attempt to create TargetToExtent %d", resp.StatusCode)
+				extent.Delete(freenasServer)
+				targetGroup.Delete(freenasServer)
+				target.Delete(freenasServer)
+				zvol.Delete(freenasServer)
+				return nil, err
+			}
+		} else {
+			extent.Delete(freenasServer)
+			targetGroup.Delete(freenasServer)
+			target.Delete(freenasServer)
+			zvol.Delete(freenasServer)
+			return nil, err
+		}
 	}
+
+	// use this for testing idempotency
+	//return nil, errors.New("fake fail")
 
 	var portals []string
 	if len(config.ProvisionerPortals) > 0 {
 		portals = strings.Split(config.ProvisionerPortals, ",")
 	}
 
-	var lun int32
-
+	//mode := v1.PersistentVolumeFilesystem
+	//VolumeMode:                    &mode,
+	//v1.PersistentVolumeR
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
@@ -473,8 +531,10 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 				"pool":                            parentDs.Pool,
 				"zvol":                            zvolName,
 				"iscsiName":                       iscsiName,
-				"targetId":                        strconv.Itoa(target.Id),
-				"extentId":                        strconv.Itoa(extent.Id),
+				"targetId":                        strconv.Itoa(target.ID),
+				"targetGroupId":                   strconv.Itoa(targetGroup.ID),
+				"extentId":                        strconv.Itoa(extent.ID),
+				"targetToExtentId":                strconv.Itoa(targetToExtent.ID),
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -484,14 +544,14 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
 			},
 			// set volumeMode from PVC Spec
-			//VolumeMode: options.PVC.Spec.VolumeMode,
+			VolumeMode: options.PVC.Spec.VolumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				ISCSI: &v1.ISCSIVolumeSource{
+				ISCSI: &v1.ISCSIPersistentVolumeSource{
 					TargetPortal:   config.ProvisionerTargetPortal,
 					Portals:        portals,
 					IQN:            iscsiConfig.Basename + ":" + iscsiName,
 					ISCSIInterface: config.ProvisionerISCSIInterface,
-					Lun:            lun,
+					Lun:            int32(*targetToExtent.Lunid),
 					ReadOnly:       extent.Ro,
 					FSType:         config.FSType,
 					//DiscoveryCHAPAuth: false,
@@ -545,6 +605,11 @@ func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
 	}
 
 	var err error
+	var resp *http.Response
+
+	if resp != nil && resp.StatusCode == 200 {
+		glog.Infof("stuff and stuff")
+	}
 
 	// get config
 	config, err := p.GetConfig(volume.Spec.StorageClassName)
@@ -563,7 +628,7 @@ func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
 	parentDs := freenas.Dataset{
 		Name: datasetParentName,
 	}
-	err = parentDs.Get(freenasServer)
+	resp, err = parentDs.Get(freenasServer)
 	if err != nil {
 		return err
 	}
@@ -573,20 +638,24 @@ func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
 	// Delete target
 	// NOTE: deletting a target inherently deletes associated targetgroup(s) and targettoextent(s)
 	target := freenas.Target{
-		Id: targetID,
+		ID: targetID,
 	}
-	err = target.Delete(freenasServer)
+	resp, err = target.Delete(freenasServer)
 	if err != nil {
-		return err
+		if resp.StatusCode != 404 {
+			return err
+		}
 	}
 
 	// Delete extent
 	extent := freenas.Extent{
-		Id: extentID,
+		ID: extentID,
 	}
-	err = extent.Delete(freenasServer)
+	resp, err = extent.Delete(freenasServer)
 	if err != nil {
-		return err
+		if resp.StatusCode != 404 {
+			return err
+		}
 	}
 
 	// Delete zvol
@@ -594,15 +663,34 @@ func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
 		Name:    zvolName,
 		Dataset: parentDs,
 	}
-	err = zvol.Delete(freenasServer)
+	resp, err = zvol.Delete(freenasServer)
 	if err != nil {
-		return err
+		if resp.StatusCode != 404 {
+			if resp.StatusCode == 400 && strings.Contains(err.Error(), "dataset does not exist") {
+				glog.Infof("Zvol %s/%s already deleted", zvol.Dataset.Name, zvol.Name)
+			} else {
+				return err
+			}
+		}
 	}
+
+	// use this for testing idempotency
+	//return errors.New("fake fail")
 
 	return nil
 }
 
-func (p *freenasProvisioner) GetServer(config freenasProvisionerConfig) (*freenas.FreenasServer, error) {
+func (p *freenasProvisioner) ShouldProvision(*v1.PersistentVolumeClaim) bool {
+	//glog.Infof("ShouldProvision invoked")
+	return true
+}
+
+func (p *freenasProvisioner) SupportsBlock() bool {
+	//glog.Infof("SupportsBlock invoked")
+	return true
+}
+
+func (p *freenasProvisioner) GetServer(config freenasProvisionerConfig) (*freenas.Server, error) {
 	return freenas.NewFreenasServer(
 		config.ServerProtocol, config.ServerHost, config.ServerPort,
 		config.ServerUsername, config.ServerPassword,
@@ -631,18 +719,18 @@ func TruncateString(str string, num int) string {
 	return bnoden
 }
 
+/*
 // Prep for resizing
 // https://github.com/kubernetes-incubator/external-storage/blob/master/gluster/file/cmd/glusterfile-provisioner/glusterfile-provisioner.go#L433
-/*
+// https://github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/blob/d22b74e900af4bf90174d259c3e52c3680b41ab4/controller/volume.go
+
 func (p *freenasProvisioner) RequiresFSResize() bool {
-	return false
-}
-
-func (p *glusterfileProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
-	return newVolumeSize, nil
-}
-
-func (p *iscsiProvisioner) SupportsBlock() bool {
 	return true
+}
+
+func (p *freenasProvisioner) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	//return newVolumeSize, nil
+	glog.Infof("STUFF AND STUFF")
+	return oldSize, fmt.Errorf("ExpandVolumeDevice not yet implemented")
 }
 */

@@ -3,15 +3,18 @@ package freenas
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
+	"net/http"
 	"path/filepath"
+
+	"github.com/golang/glog"
 )
 
 var (
-	_ FreenasResource = &Dataset{}
+	_ Resource = &Dataset{}
 )
 
+// Dataset represents an zfs dataset
 type Dataset struct {
 	Avail          int64  `json:"avail,omitempty"`
 	Mountpoint     string `json:"mountpoint,omitempty"`
@@ -29,7 +32,8 @@ func (d *Dataset) String() string {
 	return filepath.Join(d.Pool, d.Name)
 }
 
-func (d *Dataset) CopyFrom(source FreenasResource) error {
+// CopyFrom copies data from a response into an existing resource instance
+func (d *Dataset) CopyFrom(source Resource) error {
 	src, ok := source.(*Dataset)
 	if ok {
 		d.Avail = src.Avail
@@ -47,27 +51,28 @@ func (d *Dataset) CopyFrom(source FreenasResource) error {
 	return errors.New("Cannot copy, src is not a Dataset")
 }
 
-func (d *Dataset) Get(server *FreenasServer) error {
+// Get gets a Dataset instance
+func (d *Dataset) Get(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/storage/dataset/%s/", d.Name)
 	var dataset Dataset
 	resp, err := server.getSlingConnection().Get(endpoint).ReceiveSuccess(&dataset)
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return errors.New(fmt.Sprintf("Error getting dataset \"%s\" - message: %v, status: %d", d.Name, body, resp.StatusCode))
+		return resp, fmt.Errorf("Error getting dataset \"%s\" - message: %v, status: %d", d.Name, body, resp.StatusCode)
 	}
 
 	d.CopyFrom(&dataset)
 
-	return nil
+	return resp, nil
 }
 
-func (d *Dataset) Create(server *FreenasServer) error {
+// Create creates a Dataset instance
+func (d *Dataset) Create(server *Server) (*http.Response, error) {
 	parent, dsName := filepath.Split(d.Name)
 	endpoint := fmt.Sprintf("/api/v1.0/storage/dataset/%s", parent)
 	var dataset Dataset
@@ -82,33 +87,32 @@ func (d *Dataset) Create(server *FreenasServer) error {
 
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return resp, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return errors.New(fmt.Sprintf("Error creating dataset \"%s\" - message: %v, status: %d", d.Name, body, resp.StatusCode))
+		return resp, fmt.Errorf("Error creating dataset \"%s\" - message: %v, status: %d", d.Name, body, resp.StatusCode)
 	}
 
 	d.CopyFrom(&dataset)
 
-	return nil
+	return resp, nil
 }
 
-func (d *Dataset) Delete(server *FreenasServer) error {
+// Delete deletes a Dataset instance
+func (d *Dataset) Delete(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/storage/dataset/%s/", d.Name)
 	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 204 {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return errors.New(fmt.Sprintf("Error deleting dataset \"%s\" - %v", d.Name, body))
+		return resp, fmt.Errorf("Error deleting dataset \"%s\" - %v", d.Name, body)
 	}
 
-	return nil
+	return resp, nil
 }

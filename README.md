@@ -121,6 +121,17 @@ FreeNAS side. In case of issue, follow the provisioner's logs using:
 kubectl -n kube-system logs -f freenas-iscsi-provisioner-<id>
 ```
 
+# Performance
+
+100 10MiB PVCs
+Createing took ~10 minutes
+
+Deleting took ~6 minutes
+
+# Testing
+
+Choas testing has been performed to ensure the various actions are idempotent.
+
 # Development
 
 ```
@@ -159,21 +170,23 @@ make fmt
 - http://api.freenas.org
 - https://doc.freenas.org/11/sharing.html#block-iscsi
 - https://github.com/kubernetes-incubator/external-storage/blob/master/iscsi/targetd/provisioner/iscsi-provisioner.go
+- https://github.com/dghubble/sling
 
 ## TODO
 
 - volume resizing - https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/grow-volume-size.md
 - volume snapshots - https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/volume-snapshotting.md
 - mount options - https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/mount-options.md
-- cleanup empty namespaces?
-- do not delete when deterministic volumes pre-existed (ie: only delete if the provisioner created volume)
 - CHAP
 - fsType
+- properly handle `zvol` API differences with `volsize` getting sent as string and returned as int
+- loop GetBy<foo> requests that require `limit` param
+- ~~recursive zvol delete in v1 api~~
 
 ## Notes
 
 To sniff API traffic between host and server:
 
 ```
-sudo tcpdump -A -s 0 'host <server ip> and tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)'
+sudo tcpdump -i any -A -s 0 'host <server ip> and tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)'
 ```

@@ -3,26 +3,30 @@ package freenas
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
+	"net/http"
+
+	"github.com/golang/glog"
 )
 
 var (
-	_ FreenasResource = &Initiator{}
+	_ Resource = &Initiator{}
 )
 
+// Initiator represents an Initiator instance
 type Initiator struct {
-	Id          int    `json:"id,omitempty"`
+	ID          int    `json:"id,omitempty"`
 	Tag         int    `json:"iscsi_target_initiator_tag,omitempty"`
 	AuthNetwork string `json:"iscsi_target_initiator_auth_network,omitempty"`
 	Comment     string `json:"iscsi_target_Initiator_comment,omitempty"`
 	Initiators  string `json:"iscsi_target_initiator_initiators,omitempty"`
 }
 
-func (i *Initiator) CopyFrom(source FreenasResource) error {
+// CopyFrom copies data from a response into an existing resource instance
+func (i *Initiator) CopyFrom(source Resource) error {
 	src, ok := source.(*Initiator)
 	if ok {
-		i.Id = src.Id
+		i.ID = src.ID
 		i.Tag = src.Tag
 		i.AuthNetwork = src.AuthNetwork
 		i.Comment = src.Comment
@@ -32,46 +36,47 @@ func (i *Initiator) CopyFrom(source FreenasResource) error {
 	return errors.New("Cannot copy, src is not a Initiator")
 }
 
-func (i *Initiator) Get(server *FreenasServer) error {
-	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/authorizedinitiator/%d/", i.Id)
+// Get gets an Initiator instance
+func (i *Initiator) Get(server *Server) (*http.Response, error) {
+	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/authorizedinitiator/%d/", i.ID)
 	var initiator Initiator
 	resp, err := server.getSlingConnection().Get(endpoint).ReceiveSuccess(&initiator)
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return resp, err
 	}
-	defer resp.Body.Close()
 
 	i.CopyFrom(&initiator)
 
-	return nil
+	return resp, nil
 }
 
-func (i *Initiator) Create(server *FreenasServer) error {
+// Create creates an Initiator instance
+func (i *Initiator) Create(server *Server) (*http.Response, error) {
 	endpoint := "/api/v1.0/services/iscsi/authorizedinitiator/"
 	var initiator Initiator
 	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(i).Receive(&initiator, nil)
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return resp, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return errors.New(fmt.Sprintf("Error creating initiator for %+v - %v", *i, body))
+		return resp, fmt.Errorf("Error creating initiator for %+v - %v", *i, body)
 	}
 
 	i.CopyFrom(&initiator)
 
-	return nil
+	return resp, nil
 }
 
-func (i *Initiator) Delete(server *FreenasServer) error {
-	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/authorizedinitiator/%d/", i.Id)
-	_, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
+// Delete deletes an Initiator instance
+func (i *Initiator) Delete(server *Server) (*http.Response, error) {
+	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/authorizedinitiator/%d/", i.ID)
+	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
 	if err != nil {
 		glog.Warningln(err)
 	}
-	return err
+	return resp, err
 }

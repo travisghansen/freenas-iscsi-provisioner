@@ -3,17 +3,17 @@ package cli
 import (
 	"flag"
 	"fmt"
+	"os"
+	"syscall"
+
 	"github.com/golang/glog"
-	"github.com/jawher/mow.cli"
+	cli "github.com/jawher/mow.cli"
 	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	freenasProvisioner "github.com/travisghansen/freenas-iscsi-provisioner/provisioner"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"syscall"
-	"time"
 )
 
 const (
@@ -111,19 +111,15 @@ func execute() {
 		*identifier,
 	)
 
-	// Start the provision controller which will dynamically provision datasets and nfs shares
 	pc := controller.NewProvisionController(
 		clientset,
-		15*time.Second,
 		*provisionerName,
 		clientFreenasProvisioner,
 		serverVersion.GitVersion,
-		exponentialBackOffOnError,
-		failedRetryThreshold,
-		leasePeriod,
-		renewDeadline,
-		retryPeriod,
-		termLimit,
+		//controller.MetricsPort(9000),
+		//controller.TermLimit(0*time.Minute),
+		//controller.Threadiness(50),
 	)
+
 	pc.Run(wait.NeverStop)
 }

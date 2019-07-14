@@ -2,13 +2,14 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: freenas-test-iscsi-pvc
+  name: freenas-test-iscsi-block-pvc
   annotations:
     foo: bar
 spec:
   storageClassName: freenas-iscsi
   accessModes:
     - ReadWriteOnce
+  volumeMode: Block
   resources:
     requests:
       storage: 1Mi

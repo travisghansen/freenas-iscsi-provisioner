@@ -3,16 +3,19 @@ package freenas
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
+	"net/http"
+
+	"github.com/golang/glog"
 )
 
 var (
-	_ FreenasResource = &Portal{}
+	_ Resource = &Portal{}
 )
 
+// Portal represents a Portal instance
 type Portal struct {
-	Id                  int      `json:"id,omitempty"`
+	ID                  int      `json:"id,omitempty"`
 	Tag                 int      `json:"iscsi_target_portal_tag,omitempty"`
 	Comment             string   `json:"iscsi_target_portal_comment,omitempty"`
 	Discoveryauthgroup  string   `json:"iscsi_target_portal_discoveryauthgroup,omitempty"`
@@ -20,10 +23,11 @@ type Portal struct {
 	Ips                 []string `json:"iscsi_target_portal_ips,omitempty"`
 }
 
-func (p *Portal) CopyFrom(source FreenasResource) error {
+// CopyFrom copies data from a response into an existing resource instance
+func (p *Portal) CopyFrom(source Resource) error {
 	src, ok := source.(*Portal)
 	if ok {
-		p.Id = src.Id
+		p.ID = src.ID
 		p.Tag = src.Tag
 		p.Comment = src.Comment
 		p.Discoveryauthgroup = src.Discoveryauthgroup
@@ -34,46 +38,47 @@ func (p *Portal) CopyFrom(source FreenasResource) error {
 	return errors.New("Cannot copy, src is not a Portal")
 }
 
-func (p *Portal) Get(server *FreenasServer) error {
-	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/portal/%d/", p.Id)
+// Get gets an Portal instance
+func (p *Portal) Get(server *Server) (*http.Response, error) {
+	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/portal/%d/", p.ID)
 	var portal Portal
 	resp, err := server.getSlingConnection().Get(endpoint).ReceiveSuccess(&portal)
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return resp, err
 	}
-	defer resp.Body.Close()
 
 	p.CopyFrom(&portal)
 
-	return nil
+	return resp, nil
 }
 
-func (p *Portal) Create(server *FreenasServer) error {
+// Create creates an Portal instance
+func (p *Portal) Create(server *Server) (*http.Response, error) {
 	endpoint := "/api/v1.0/services/iscsi/portal/"
 	var portal Portal
 	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(p).Receive(&portal, nil)
 	if err != nil {
 		glog.Warningln(err)
-		return err
+		return resp, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
 		body, _ := ioutil.ReadAll(resp.Body)
-		return errors.New(fmt.Sprintf("Error creating portal for %+v - %v", *p, body))
+		return resp, fmt.Errorf("Error creating portal for %+v - %v", *p, body)
 	}
 
 	p.CopyFrom(&portal)
 
-	return nil
+	return resp, nil
 }
 
-func (p *Portal) Delete(server *FreenasServer) error {
-	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/portal/%d/", p.Id)
-	_, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
+// Delete deletes an Portal instance
+func (p *Portal) Delete(server *Server) (*http.Response, error) {
+	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/portal/%d/", p.ID)
+	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
 	if err != nil {
 		glog.Warningln(err)
 	}
-	return err
+	return resp, err
 }
