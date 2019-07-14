@@ -310,10 +310,6 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	var loopErr error
 	var loopResp *http.Response
 
-	if resp != nil && resp.StatusCode == 200 {
-		glog.Infof("stuff and stuff")
-	}
-
 	// get config
 	config, err := p.GetConfig(*options.PVC.Spec.StorageClassName)
 	if err != nil {
@@ -402,9 +398,9 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		if resp.StatusCode != 409 {
 			zvol.Delete(freenasServer)
 			return nil, err
-		} else {
-			target.Get(freenasServer)
 		}
+
+		target.Get(freenasServer)
 	}
 
 	// Create targetgroup(s)
@@ -606,10 +602,6 @@ func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
 
 	var err error
 	var resp *http.Response
-
-	if resp != nil && resp.StatusCode == 200 {
-		glog.Infof("stuff and stuff")
-	}
 
 	// get config
 	config, err := p.GetConfig(volume.Spec.StorageClassName)
