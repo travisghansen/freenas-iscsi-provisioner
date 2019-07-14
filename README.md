@@ -124,7 +124,7 @@ kubectl -n kube-system logs -f freenas-iscsi-provisioner-<id>
 # Performance
 
 100 10MiB PVCs
-Createing took ~10 minutes
+Creating took ~10 minutes
 
 Deleting took ~6 minutes
 
