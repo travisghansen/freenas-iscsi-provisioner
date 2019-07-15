@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/golang/glog"
 	cli "github.com/jawher/mow.cli"
@@ -30,6 +31,15 @@ var (
 	kubeconfig      *string
 	identifier      *string
 	provisionerName *string
+
+	// controller tweaks
+	controllerThreadiness                 *int
+	controllerCreateProvisionedPVInterval *int
+	controllerLeaseDuration               *int
+	controllerRenewDeadline               *int
+	controllerRetryPeriod                 *int
+	controllerTermLimit                   *int
+	controllerMetricsPort                 *int
 )
 
 // Process all command line parameters
@@ -56,6 +66,55 @@ func Process(appName, appDesc, appVersion string) {
 		Value:  "freenas.org/iscsi",
 		Desc:   "Provisioner Name (e.g. 'provisioner' attribute of storage-class)",
 		EnvVar: "PROVISIONER_NAME",
+	})
+
+	controllerThreadiness = app.Int(cli.IntOpt{
+		Name:   "controller-threadiness",
+		Value:  4,
+		Desc:   "Number of controller threads to handle provisioner tasks",
+		EnvVar: "CONTROLLER_THREADINESS",
+	})
+
+	controllerCreateProvisionedPVInterval = app.Int(cli.IntOpt{
+		Name:   "controller-create-provisioned-pv-interval",
+		Value:  10,
+		Desc:   "controller create provisioned pv interval",
+		EnvVar: "CONTROLLER_CREATE_PROVISIONED_PV_INTERVAL",
+	})
+
+	controllerLeaseDuration = app.Int(cli.IntOpt{
+		Name:   "controller-lease-duration",
+		Value:  15,
+		Desc:   "controller lease duration",
+		EnvVar: "CONTROLLER_LEASE_DURATION",
+	})
+
+	controllerRenewDeadline = app.Int(cli.IntOpt{
+		Name:   "controller-renew-deadline",
+		Value:  10,
+		Desc:   "controller renew deadline",
+		EnvVar: "CONTROLLER_RENEW_DEADLINE",
+	})
+
+	controllerRetryPeriod = app.Int(cli.IntOpt{
+		Name:   "controller-retry-period",
+		Value:  2,
+		Desc:   "controller retry period",
+		EnvVar: "CONTROLLER_RETRY_PERIOD",
+	})
+
+	controllerTermLimit = app.Int(cli.IntOpt{
+		Name:   "controller-term-limit",
+		Value:  30,
+		Desc:   "controller term limit",
+		EnvVar: "CONTROLLER_TERM_LIMIT",
+	})
+
+	controllerMetricsPort = app.Int(cli.IntOpt{
+		Name:   "controller-metrics-port",
+		Value:  0,
+		Desc:   "port to use for prometheus metrics",
+		EnvVar: "CONTROLLER_METRICS_PORT",
 	})
 
 	app.Action = execute
@@ -116,9 +175,13 @@ func execute() {
 		*provisionerName,
 		clientFreenasProvisioner,
 		serverVersion.GitVersion,
-		//controller.MetricsPort(9000),
-		//controller.TermLimit(0*time.Minute),
-		//controller.Threadiness(50),
+		controller.Threadiness(*controllerThreadiness),
+		controller.CreateProvisionedPVInterval(time.Duration(*controllerCreateProvisionedPVInterval)*time.Second),
+		controller.LeaseDuration(time.Duration(*controllerLeaseDuration)*time.Second),
+		controller.RenewDeadline(time.Duration(*controllerRenewDeadline)*time.Second),
+		controller.RetryPeriod(time.Duration(*controllerRetryPeriod)*time.Second),
+		controller.TermLimit(time.Duration(*controllerLeaseDuration)*time.Second),
+		controller.MetricsPort(int32(*controllerMetricsPort)),
 	)
 
 	pc.Run(wait.NeverStop)
