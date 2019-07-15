@@ -103,15 +103,15 @@ func (d *Dataset) Create(server *Server) (*http.Response, error) {
 // Delete deletes a Dataset instance
 func (d *Dataset) Delete(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/storage/dataset/%s/", d.Name)
-	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
+	var e string
+	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, &e)
 	if err != nil {
 		glog.Warningln(err)
 		return nil, err
 	}
 
 	if resp.StatusCode != 204 {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return resp, fmt.Errorf("Error deleting dataset \"%s\" - %v", d.Name, body)
+		return resp, fmt.Errorf("Error deleting Dataset \"%s\" - message: %s, status: %d", d.Name, e, resp.StatusCode)
 	}
 
 	return resp, nil

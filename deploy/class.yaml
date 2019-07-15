@@ -20,6 +20,12 @@ parameters:
   # default: freenas-iscsi
   #serverSecretName:
   
+  # when provisioning partially succeeds and then fails, should we rollback (ie: delete)
+  # the assets created in FreeNAS up to the point of failure. Provisioning is idempotent
+  # so subsequent (re)requests from kubernetes to create the PV are safe if this is disabled.
+  # default: true
+  #provisionerRollbackPartialFailures:
+
   # the name of the parent dataset (or simply pool) where all resources will
   # be created, it *must* exist before provisioner will work
   # Note: due to length limitations with iscsi the total string length must

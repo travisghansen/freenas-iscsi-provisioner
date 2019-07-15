@@ -25,11 +25,12 @@ type freenasProvisionerConfig struct {
 	FSType string
 
 	// Provisioner options
-	ProvisionerTargetPortal    string
-	ProvisionerPortals         string
-	ProvisionerISCSINamePrefix string
-	ProvisionerISCSINameSuffix string
-	ProvisionerISCSIInterface  string
+	ProvisionerRollbackPartialFailures bool
+	ProvisionerTargetPortal            string
+	ProvisionerPortals                 string
+	ProvisionerISCSINamePrefix         string
+	ProvisionerISCSINameSuffix         string
+	ProvisionerISCSIInterface          string
 
 	// Dataset options
 	DatasetParentName string
@@ -76,6 +77,7 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 	var fsType = "ext4"
 
 	// provisioner defaults
+	var provisionerRollbackPartialFailures = true
 	var provisionerTargetPortal string
 	var provisionerPortals string
 	var provisionerISCSINamePrefix string
@@ -124,6 +126,8 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 			fsType = v
 
 		// Provisioner options
+		case "provisionerRollbackPartialFailures":
+			provisionerRollbackPartialFailures, _ = strconv.ParseBool(v)
 		case "provisionerTargetPortal":
 			provisionerTargetPortal = v
 		case "provisionerPortals":
@@ -216,11 +220,12 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 		FSType: fsType,
 
 		// Provisioner options
-		ProvisionerTargetPortal:    provisionerTargetPortal,
-		ProvisionerPortals:         provisionerPortals,
-		ProvisionerISCSINamePrefix: provisionerISCSINamePrefix,
-		ProvisionerISCSINameSuffix: provisionerISCSINameSuffix,
-		ProvisionerISCSIInterface:  provisionerISCSIInterface,
+		ProvisionerRollbackPartialFailures: provisionerRollbackPartialFailures,
+		ProvisionerTargetPortal:            provisionerTargetPortal,
+		ProvisionerPortals:                 provisionerPortals,
+		ProvisionerISCSINamePrefix:         provisionerISCSINamePrefix,
+		ProvisionerISCSINameSuffix:         provisionerISCSINameSuffix,
+		ProvisionerISCSIInterface:          provisionerISCSIInterface,
 
 		// Dataset options
 		DatasetParentName: datasetParentName,
@@ -380,6 +385,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	if err != nil {
 		//glog.Infof("zvol error %s", err.Error())
 		if resp.StatusCode == 400 && strings.Contains(err.Error(), "dataset already exists") {
+			glog.Infof("Zvol %s/%s already exists", parentDs.Pool, zvol.Name)
 			//zvol.Get(freenasServer)
 		} else {
 			return nil, err
@@ -396,7 +402,9 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	if err != nil {
 		// already exists
 		if resp.StatusCode != 409 {
-			zvol.Delete(freenasServer)
+			if config.ProvisionerRollbackPartialFailures {
+				zvol.Delete(freenasServer)
+			}
 			return nil, err
 		}
 
@@ -419,14 +427,18 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 			loopResp, loopErr = targetGroup.Get(freenasServer)
 			if loopErr != nil || loopResp.StatusCode != 200 {
 				glog.Infof("failed attempt to create TargetGroup %d", resp.StatusCode)
-				target.Delete(freenasServer)
-				zvol.Delete(freenasServer)
+				if config.ProvisionerRollbackPartialFailures {
+					target.Delete(freenasServer)
+					zvol.Delete(freenasServer)
+				}
 				return nil, err
 			}
 		} else if resp.StatusCode != 409 {
 			glog.Infof("failed attempt to create TargetGroup %d", resp.StatusCode)
-			target.Delete(freenasServer)
-			zvol.Delete(freenasServer)
+			if config.ProvisionerRollbackPartialFailures {
+				target.Delete(freenasServer)
+				zvol.Delete(freenasServer)
+			}
 			return nil, err
 		}
 	}
@@ -458,18 +470,22 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 				loopResp, loopErr = extent.Get(freenasServer)
 				if loopErr != nil {
 					glog.Infof("failed attempt to create Extent %d", resp.StatusCode)
-					targetGroup.Delete(freenasServer)
-					target.Delete(freenasServer)
-					zvol.Delete(freenasServer)
+					if config.ProvisionerRollbackPartialFailures {
+						targetGroup.Delete(freenasServer)
+						target.Delete(freenasServer)
+						zvol.Delete(freenasServer)
+					}
 					return nil, err
 				}
 				break
 			}
 
 			if extentMaxLoops == extentLoopCurrent {
-				targetGroup.Delete(freenasServer)
-				target.Delete(freenasServer)
-				zvol.Delete(freenasServer)
+				if config.ProvisionerRollbackPartialFailures {
+					targetGroup.Delete(freenasServer)
+					target.Delete(freenasServer)
+					zvol.Delete(freenasServer)
+				}
 				return nil, err
 			}
 			extentLoopCurrent++
@@ -492,17 +508,21 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 			loopResp, loopErr = targetToExtent.Get(freenasServer)
 			if loopErr != nil {
 				glog.Infof("failed attempt to create TargetToExtent %d", resp.StatusCode)
+				if config.ProvisionerRollbackPartialFailures {
+					extent.Delete(freenasServer)
+					targetGroup.Delete(freenasServer)
+					target.Delete(freenasServer)
+					zvol.Delete(freenasServer)
+				}
+				return nil, err
+			}
+		} else {
+			if config.ProvisionerRollbackPartialFailures {
 				extent.Delete(freenasServer)
 				targetGroup.Delete(freenasServer)
 				target.Delete(freenasServer)
 				zvol.Delete(freenasServer)
-				return nil, err
 			}
-		} else {
-			extent.Delete(freenasServer)
-			targetGroup.Delete(freenasServer)
-			target.Delete(freenasServer)
-			zvol.Delete(freenasServer)
 			return nil, err
 		}
 	}

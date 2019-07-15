@@ -129,13 +129,14 @@ func (e *Extent) Create(server *Server) (*http.Response, error) {
 // Delete deletes an Extent instance
 func (e *Extent) Delete(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/extent/%d/", e.ID)
-	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
+	var es string
+	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, &es)
 	if err != nil {
 		glog.Warningln(err)
 	}
 
 	if resp.StatusCode != 204 {
-		return resp, fmt.Errorf("Error deleting Extent: %d", resp.StatusCode)
+		return resp, fmt.Errorf("Error deleting Extent - message: %s, status: %d", es, resp.StatusCode)
 	}
 
 	return resp, nil

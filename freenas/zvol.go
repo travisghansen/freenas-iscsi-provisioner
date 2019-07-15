@@ -1,6 +1,7 @@
 package freenas
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -69,17 +70,16 @@ func (z *Zvol) Create(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/storage/volume/%s/zvols/", z.Dataset.Pool)
 	//var zvol Zvol
 
-	er := new(ErrorResponse)
-	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(z).Receive(nil, er)
-
+	var e interface{}
+	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(z).Receive(nil, &e)
 	if err != nil {
 		glog.Warningln(err)
 		return resp, err
 	}
 
 	if resp.StatusCode != 202 {
-		//return resp, fmt.Errorf("Error creating zvol for %+v - %s", *z, responseString)
-		return resp, fmt.Errorf("Error creating zvol for %+v - %+v - %s", *z, *er, er.DefaultAll[0])
+		body, _ := json.Marshal(e)
+		return resp, fmt.Errorf("Error creating zvol for %+v - message: %s, status: %d", *z, string(body), resp.StatusCode)
 	}
 
 	//z.CopyFrom(&zvol)

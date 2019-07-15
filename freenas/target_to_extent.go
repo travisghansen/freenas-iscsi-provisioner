@@ -93,7 +93,7 @@ func (t *TargetToExtent) Create(server *Server) (*http.Response, error) {
 
 	if resp.StatusCode != 201 {
 		body, _ := json.Marshal(e)
-		return resp, fmt.Errorf("Error creating TargetToExtent for %+v - %s", *t, string(body))
+		return resp, fmt.Errorf("Error creating TargetToExtent for %+v - message: %s, status: %d", *t, string(body), resp.StatusCode)
 	}
 
 	t.CopyFrom(&targetToExtent)

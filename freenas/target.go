@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/golang/glog"
@@ -101,15 +100,16 @@ func (t *Target) GetByName(server *Server) (*http.Response, error) {
 func (t *Target) Create(server *Server) (*http.Response, error) {
 	endpoint := "/api/v1.0/services/iscsi/target/"
 	var target Target
-	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(t).Receive(&target, nil)
+	var e interface{}
+	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(t).Receive(&target, &e)
 	if err != nil {
 		glog.Warningln(err)
 		return resp, err
 	}
 
 	if resp.StatusCode != 201 {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return resp, fmt.Errorf("Error creating Target for %+v - %v", *t, body)
+		body, _ := json.Marshal(e)
+		return resp, fmt.Errorf("Error creating Target for %+v - message: %s, status: %d", *t, string(body), resp.StatusCode)
 	}
 
 	t.CopyFrom(&target)
@@ -120,13 +120,14 @@ func (t *Target) Create(server *Server) (*http.Response, error) {
 // Delete deletes a Target instance
 func (t *Target) Delete(server *Server) (*http.Response, error) {
 	endpoint := fmt.Sprintf("/api/v1.0/services/iscsi/target/%d/", t.ID)
-	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, nil)
+	var e string
+	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, &e)
 	if err != nil {
 		glog.Warningln(err)
 	}
 
 	if resp.StatusCode != 204 {
-		return resp, fmt.Errorf("Error deleting Target: %d", resp.StatusCode)
+		return resp, fmt.Errorf("Error deleting Target - message: %s, status: %d", e, resp.StatusCode)
 	}
 
 	return resp, nil

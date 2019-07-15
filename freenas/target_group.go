@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/golang/glog"
@@ -92,15 +91,16 @@ func (t *TargetGroup) Get(server *Server) (*http.Response, error) {
 func (t *TargetGroup) Create(server *Server) (*http.Response, error) {
 	endpoint := "/api/v1.0/services/iscsi/targetgroup/"
 	var targetGroup TargetGroup
-	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(t).Receive(&targetGroup, nil)
+	var e interface{}
+	resp, err := server.getSlingConnection().Post(endpoint).BodyJSON(t).Receive(&targetGroup, &e)
 	if err != nil {
 		glog.Warningln(err)
 		return resp, err
 	}
 
 	if resp.StatusCode != 201 {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return resp, fmt.Errorf("Error creating targetgroup for %+v - %v", *t, body)
+		body, _ := json.Marshal(e)
+		return resp, fmt.Errorf("Error creating targetgroup for %+v - message: %s, status: %d", *t, string(body), resp.StatusCode)
 	}
 
 	t.CopyFrom(&targetGroup)
