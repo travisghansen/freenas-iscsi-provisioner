@@ -18,7 +18,22 @@ spec:
         - name: freenas-iscsi-provisioner
           image: docker.io/travisghansen/freenas-iscsi-provisioner:latest
           env:
+            # when running multiple instances each pod should have a unique identifier
             #- name: IDENTIFIER
-            #  value:
+            #  valueFrom:
+            #    fieldRef:
+            #      fieldPath: metadata.name
             #- name: PROVISIONER_NAME
             #  value:
+            #- name: CONTROLLER_THREADINESS
+            #  value: "4"
+            #- name: CONTROLLER_CREATE_PROVISIONED_PV_INTERVAL
+            #  value: "10"
+            #- name: CONTROLLER_LEASE_DURATION
+            #  value: "15"
+            #- name: CONTROLLER_RENEW_DEADLINE
+            #  value: "10"
+            #- name: CONTROLLER_RETRY_PERIOD
+            #  value: "2"
+            
+

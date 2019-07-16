@@ -133,6 +133,7 @@ func (e *Extent) Delete(server *Server) (*http.Response, error) {
 	resp, err := server.getSlingConnection().Delete(endpoint).Receive(nil, &es)
 	if err != nil {
 		glog.Warningln(err)
+		return resp, err
 	}
 
 	if resp.StatusCode != 204 {

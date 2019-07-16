@@ -100,6 +100,7 @@ func (z *Zvol) Delete(server *Server) (*http.Response, error) {
 	resp, err := server.getSlingConnection().Delete(endpoint).BodyJSON(b).Receive(nil, &e)
 	if err != nil {
 		glog.Warningln(err)
+		return resp, err
 	}
 
 	if resp.StatusCode != 204 {
