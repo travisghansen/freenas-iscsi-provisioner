@@ -29,7 +29,7 @@ used. While multiple `StorageClass` resources may point to the same server
 and hence same `Secret`, it is recommended to create a new `Secret` for each
 `StorageClass` resource.
 
-It is **highly** recommended to read `deploy/claim.yaml` to review available
+It is **highly** recommended to read `deploy/class.yaml` to review available
 `parameters` and gain a better understanding of functionality and behavior.
 
 ## FreeNAS Setup
