@@ -21,7 +21,7 @@ type Extent struct {
 	Blocksize      int    `json:"iscsi_target_extent_blocksize,omitempty"`
 	Comment        string `json:"iscsi_target_extent_comment,omitempty"`
 	Filesize       string `json:"iscsi_target_extent_filesize,omitempty"`
-	InsecureTpc    bool   `json:"iscsi_target_extent_insecure_tpc,omitempty"`
+	InsecureTpc    bool   `json:"iscsi_target_extent_insecure_tpc"`
 	Legacy         bool   `json:"iscsi_target_extent_legacy,omitempty"`
 	Naa            string `json:"iscsi_target_extent_naa,omitempty"`
 	Name           string `json:"iscsi_target_extent_name,omitempty"`
