@@ -29,7 +29,7 @@ parameters:
   # the name of the parent dataset (or simply pool) where all resources will
   # be created, it *must* exist before provisioner will work
   # Note: due to length limitations with iscsi the total string length must
-  # NOT exceed 22 chars (this includes slashes etc)
+  # NOT exceed 17 chars (this includes slashes etc)
   # example: tank/k8s/mycluster
   # default: tank
   #datasetParentName:

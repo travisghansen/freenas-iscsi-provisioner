@@ -32,7 +32,8 @@ deploy:
   skip_cleanup: true
   on:
     repo: travisghansen/freenas-iscsi-provisioner
-    branch: "master"
+    all_branches: true
+    condition: $TRAVIS_BRANCH =~ ^master|next$
 
 - provider: script
   script: bash .travis/docker-release.sh

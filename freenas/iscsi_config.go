@@ -2,6 +2,8 @@ package freenas
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/golang/glog"
@@ -40,6 +42,11 @@ func (i *ISCSIConfig) Get(server *Server) (*http.Response, error) {
 	if err != nil {
 		glog.Warningln(err)
 		return resp, err
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return resp, fmt.Errorf("Error getting iscsi_config - message: %v, status: %d", body, resp.StatusCode)
 	}
 
 	i.CopyFrom(&iscsiConfig)
