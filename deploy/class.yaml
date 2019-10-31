@@ -77,6 +77,27 @@ parameters:
   # default:
   #targetGroupAuthgroup:
 
+  # iSCSI PV authentication settings
+  #
+  # Whether portal discovery authentication is employed
+  # default: false
+  #targetDiscoveryCHAPAuth:
+  #
+  # Whether session authentication is employed
+  # default: false
+  #targetSessionCHAPAuth:
+
+  # If either of the two settings above are true, then iSCSI
+  # secretRef will be filled according to the following settings
+  #
+  # Namespace of secret which holds iscsi credentials
+  # default: kube-system
+  #authSecretNamespace:
+
+  # Name of secret which holds iscsi credentials
+  # default: freenas-iscsi-chap
+  #authSecretName:
+
   # compression setting on the zvol
   # options: "" (inherit), lz4, gzip-9, etc
   # default: (inherit)
