@@ -9,12 +9,12 @@ import (
 
 	"github.com/golang/glog"
 	cli "github.com/jawher/mow.cli"
+	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	freenasProvisioner "github.com/travisghansen/freenas-iscsi-provisioner/provisioner"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/sig-storage-lib-external-provisioner/controller"
 )
 
 const (
@@ -23,6 +23,7 @@ const (
 	leasePeriod               = controller.DefaultLeaseDuration
 	retryPeriod               = controller.DefaultRetryPeriod
 	renewDeadline             = controller.DefaultRenewDeadline
+	termLimit                 = controller.DefaultTermLimit
 )
 
 var (
@@ -37,6 +38,7 @@ var (
 	controllerLeaseDuration               *int
 	controllerRenewDeadline               *int
 	controllerRetryPeriod                 *int
+	controllerTermLimit                   *int
 	controllerMetricsPort                 *int
 )
 
@@ -99,6 +101,13 @@ func Process(appName, appDesc, appVersion string) {
 		Value:  2,
 		Desc:   "controller retry period",
 		EnvVar: "CONTROLLER_RETRY_PERIOD",
+	})
+
+	controllerTermLimit = app.Int(cli.IntOpt{
+		Name:   "controller-term-limit",
+		Value:  30,
+		Desc:   "controller term limit",
+		EnvVar: "CONTROLLER_TERM_LIMIT",
 	})
 
 	controllerMetricsPort = app.Int(cli.IntOpt{
@@ -171,6 +180,7 @@ func execute() {
 		controller.LeaseDuration(time.Duration(*controllerLeaseDuration)*time.Second),
 		controller.RenewDeadline(time.Duration(*controllerRenewDeadline)*time.Second),
 		controller.RetryPeriod(time.Duration(*controllerRetryPeriod)*time.Second),
+		controller.TermLimit(time.Duration(*controllerLeaseDuration)*time.Second),
 		controller.MetricsPort(int32(*controllerMetricsPort)),
 	)
 
