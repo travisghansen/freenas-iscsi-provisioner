@@ -22,7 +22,8 @@ var (
 
 type freenasProvisionerConfig struct {
 	// common params
-	FSType string
+	FSType        string
+	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy
 
 	// Provisioner options
 	ProvisionerRollbackPartialFailures bool
@@ -40,6 +41,11 @@ type freenasProvisionerConfig struct {
 	TargetGroupAuthtype       string
 	TargetGroupInitiatorgroup int
 	TargetGroupPortalgroup    int
+
+	// Authentication options
+	DiscoveryCHAPAuth bool
+	SessionCHAPAuth   bool
+	AuthSecretRef     *v1.SecretReference
 
 	// Zvol options
 	ZvolCompression string
@@ -92,6 +98,13 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 	var targetGroupAuthtype = "None"
 	var targetGroupInitiatorgroup int
 	var targetGroupPortalgroup int
+
+	// Authentication options
+	var targetDiscoveryCHAPAuth = false
+	var targetSessionCHAPAuth = false
+	var authSecretNamespace = "kube-system"
+	var authSecretName = "freenas-iscsi-chap"
+	var authSecretRef *v1.SecretReference
 
 	// zvol defaults
 	var zvolCompression string
@@ -152,6 +165,16 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 			targetGroupInitiatorgroup, _ = strconv.Atoi(v)
 		case "targetGroupPortalgroup":
 			targetGroupPortalgroup, _ = strconv.Atoi(v)
+
+		// Authentication options
+		case "targetDiscoveryCHAPAuth":
+			targetDiscoveryCHAPAuth, _ = strconv.ParseBool(v)
+		case "targetSessionCHAPAuth":
+			targetSessionCHAPAuth, _ = strconv.ParseBool(v)
+		case "authSecretNamespace":
+			authSecretNamespace = v
+		case "authSecretName":
+			authSecretName = v
 
 		// Zvol options
 		case "zvolCompression":
@@ -216,8 +239,16 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 		provisionerTargetPortal = serverHost + ":3260"
 	}
 
+	if targetDiscoveryCHAPAuth || targetSessionCHAPAuth {
+		authSecretRef = &v1.SecretReference{
+			Namespace: authSecretNamespace,
+			Name:      authSecretName,
+		}
+	}
+
 	return &freenasProvisionerConfig{
-		FSType: fsType,
+		FSType:        fsType,
+		ReclaimPolicy: class.ReclaimPolicy,
 
 		// Provisioner options
 		ProvisionerRollbackPartialFailures: provisionerRollbackPartialFailures,
@@ -235,6 +266,11 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 		TargetGroupAuthtype:       targetGroupAuthtype,
 		TargetGroupInitiatorgroup: targetGroupInitiatorgroup,
 		TargetGroupPortalgroup:    targetGroupPortalgroup,
+
+		// Authentication options
+		DiscoveryCHAPAuth: targetDiscoveryCHAPAuth,
+		SessionCHAPAuth:   targetSessionCHAPAuth,
+		AuthSecretRef:     authSecretRef,
 
 		// Zvol options
 		ZvolCompression: zvolCompression,
@@ -554,7 +590,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeReclaimPolicy: options.PersistentVolumeReclaimPolicy,
+			PersistentVolumeReclaimPolicy: *config.ReclaimPolicy,
 			AccessModes:                   options.PVC.Spec.AccessModes,
 			Capacity: v1.ResourceList{
 				v1.ResourceName(v1.ResourceStorage): options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)],
@@ -563,16 +599,16 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 			VolumeMode: options.PVC.Spec.VolumeMode,
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				ISCSI: &v1.ISCSIPersistentVolumeSource{
-					TargetPortal:   config.ProvisionerTargetPortal,
-					Portals:        portals,
-					IQN:            iscsiConfig.Basename + ":" + iscsiName,
-					ISCSIInterface: config.ProvisionerISCSIInterface,
-					Lun:            int32(*targetToExtent.Lunid),
-					ReadOnly:       extent.Ro,
-					FSType:         config.FSType,
-					//DiscoveryCHAPAuth: false,
-					//SessionCHAPAuth:   false,
-					//SecretRef:         getSecretRef(getBool(options.Parameters["chapAuthDiscovery"]), getBool(options.Parameters["chapAuthSession"]), &v1.SecretReference{Name: viper.GetString("provisioner-name") + "-chap-secret"}),
+					TargetPortal:      config.ProvisionerTargetPortal,
+					Portals:           portals,
+					IQN:               iscsiConfig.Basename + ":" + iscsiName,
+					ISCSIInterface:    config.ProvisionerISCSIInterface,
+					Lun:               int32(*targetToExtent.Lunid),
+					ReadOnly:          extent.Ro,
+					FSType:            config.FSType,
+					DiscoveryCHAPAuth: config.DiscoveryCHAPAuth,
+					SessionCHAPAuth:   config.SessionCHAPAuth,
+					SecretRef:         config.AuthSecretRef,
 				},
 			},
 		},

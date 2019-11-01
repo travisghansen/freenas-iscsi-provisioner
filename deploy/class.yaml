@@ -6,6 +6,8 @@ metadata:
 #  annotations:
 #    storageclass.kubernetes.io/is-default-class: "true"
 provisioner: freenas.org/iscsi
+# Delete|Retain
+reclaimPolicy: Delete
 allowVolumeExpansion: false
 parameters:
   # set the default filesystem
@@ -76,6 +78,28 @@ parameters:
   # ID of the auth group
   # default:
   #targetGroupAuthgroup:
+
+  # Whether portal discovery authentication is employed
+  # default: false
+  #targetDiscoveryCHAPAuth:
+
+  # Whether session authentication is employed
+  # default: false
+  #targetSessionCHAPAuth:
+
+  # If either of the two settings above are true, then iSCSI
+  # secretRef will be filled according to the following settings
+  #
+  # Note: once volumes have been provisioned you should NOT change
+  # the secret name or namespace settings
+  #
+  # Namespace of secret which holds iscsi credentials
+  # default: kube-system
+  #authSecretNamespace:
+
+  # Name of secret which holds iscsi credentials
+  # default: freenas-iscsi-chap
+  #authSecretName:
 
   # compression setting on the zvol
   # options: "" (inherit), lz4, gzip-9, etc

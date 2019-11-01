@@ -1,0 +1,16 @@
+kind: Secret
+apiVersion: v1
+type: kubernetes.io/iscsi-chap
+metadata:
+  namespace: kube-system
+  name: freenas-iscsi-chap
+stringData:
+  # Set the relevant auth credentials here
+  discovery.sendtargets.auth.username: ""
+  discovery.sendtargets.auth.password: ""
+  discovery.sendtargets.auth.username_in: ""
+  discovery.sendtargets.auth.password_in: ""
+  node.session.auth.username: ""
+  node.session.auth.password: ""
+  node.session.auth.username_in: ""
+  node.session.auth.password_in: ""

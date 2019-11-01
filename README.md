@@ -121,6 +121,12 @@ FreeNAS side. In case of issue, follow the provisioner's logs using:
 kubectl -n kube-system logs -f freenas-iscsi-provisioner-<id>
 ```
 
+## CHAP settings
+
+You should create a secret which holds CHAP authentication credentials based on `deploy/freenas-iscsi-chap.yaml`.
+- If you have authentication enabled for the portal (discovery) then set `discovery*` parameters in the secret, and in StorageClass you should set `targetDiscoveryCHAPAuth` to `true`.
+- If you want authentication for the targets, then set `node*` parameters in the secret, and in StorageClass you should set `targetGroupAuthtype` and `targetGroupAuthgroup` accordingly, and also set `targetSessionCHAPAuth` to `true`.
+
 # Performance
 
 100 10MiB PVCs
@@ -177,7 +183,7 @@ make fmt
 - volume resizing - https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/grow-volume-size.md
 - volume snapshots - https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/volume-snapshotting.md
 - mount options - https://github.com/kubernetes/community/blob/master/contributors/design-proposals/storage/mount-options.md
-- CHAP
+- ~~CHAP~~
 - fsType
 - properly handle `zvol` API differences with `volsize` getting sent as string and returned as int
 - loop GetBy<foo> requests that require `limit` param
