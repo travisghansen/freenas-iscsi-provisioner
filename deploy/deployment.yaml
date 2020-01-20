@@ -1,11 +1,16 @@
 ---
 kind: Deployment
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 metadata:
   name: freenas-iscsi-provisioner
   namespace: kube-system
+  labels:
+    app: freenas-iscsi-provisioner
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: freenas-iscsi-provisioner
   strategy:
     type: Recreate
   template:
