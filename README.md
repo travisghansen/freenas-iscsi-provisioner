@@ -1,3 +1,12 @@
+# Deprecation Notice
+
+Non-csi drivers are no longer receiving updates from the Kubernetes team.
+As such this driver has been deprecated and replaced with a newer `csi` based
+implementation - https://github.com/democratic-csi/democratic-csi
+
+The new implementation works with all the fancy `csi` features such as snapshots,
+resizing, etc. Enjoy!
+
 # What is freenas-provisioner
 
 FreeNAS-iscsi-provisioner is a Kubernetes external provisioner.
