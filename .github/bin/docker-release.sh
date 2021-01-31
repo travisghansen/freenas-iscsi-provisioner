@@ -16,9 +16,9 @@ if [[ -n "${GIT_TAG}" ]]; then
   docker buildx build --build-arg "GIT_TAG=${GIT_TAG}" --progress plain --pull --push --platform "${DOCKER_BUILD_PLATFORM}" -t ${DOCKER_REPO}:${GIT_TAG} .
 elif [[ -n "${GIT_BRANCH}" ]]; then
   if [[ "${GIT_BRANCH}" == "master" ]]; then
-    docker buildx build --progress plain --pull --push --platform "${DOCKER_BUILD_PLATFORM}" -t ${DOCKER_REPO}:latest .
+    docker buildx build --build-arg "GIT_TAG=${GIT_BRANCH}" --progress plain --pull --push --platform "${DOCKER_BUILD_PLATFORM}" -t ${DOCKER_REPO}:latest .
   else
-    docker buildx build --progress plain --pull --push --platform "${DOCKER_BUILD_PLATFORM}" -t ${DOCKER_REPO}:${GIT_BRANCH} .
+    docker buildx build --build-arg "GIT_TAG=${GIT_BRANCH}" --progress plain --pull --push --platform "${DOCKER_BUILD_PLATFORM}" -t ${DOCKER_REPO}:${GIT_BRANCH} .
   fi
 else
   :
