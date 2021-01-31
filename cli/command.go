@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -9,12 +10,11 @@ import (
 
 	"github.com/golang/glog"
 	cli "github.com/jawher/mow.cli"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	freenasProvisioner "github.com/travisghansen/freenas-iscsi-provisioner/provisioner"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/v6/controller"
 )
 
 const (
@@ -23,7 +23,6 @@ const (
 	leasePeriod               = controller.DefaultLeaseDuration
 	retryPeriod               = controller.DefaultRetryPeriod
 	renewDeadline             = controller.DefaultRenewDeadline
-	termLimit                 = controller.DefaultTermLimit
 )
 
 var (
@@ -180,9 +179,8 @@ func execute() {
 		controller.LeaseDuration(time.Duration(*controllerLeaseDuration)*time.Second),
 		controller.RenewDeadline(time.Duration(*controllerRenewDeadline)*time.Second),
 		controller.RetryPeriod(time.Duration(*controllerRetryPeriod)*time.Second),
-		controller.TermLimit(time.Duration(*controllerLeaseDuration)*time.Second),
 		controller.MetricsPort(int32(*controllerMetricsPort)),
 	)
 
-	pc.Run(wait.NeverStop)
+	pc.Run(context.Background())
 }

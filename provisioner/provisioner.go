@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,11 +9,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/external-storage/lib/controller"
 	"github.com/travisghansen/freenas-iscsi-provisioner/freenas"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/sig-storage-lib-external-provisioner/v6/controller"
 )
 
 var (
@@ -74,8 +75,8 @@ type freenasProvisionerConfig struct {
 	ServerAllowInsecure   bool
 }
 
-func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisionerConfig, error) {
-	class, err := p.Client.StorageV1beta1().StorageClasses().Get(storageClassName, metav1.GetOptions{})
+func (p *freenasProvisioner) GetConfig(ctx context.Context, storageClassName string) (*freenasProvisionerConfig, error) {
+	class, err := p.Client.StorageV1().StorageClasses().Get(ctx, storageClassName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +213,7 @@ func (p *freenasProvisioner) GetConfig(storageClassName string) (*freenasProvisi
 		}
 	}
 
-	secret, err := p.GetSecret(serverSecretNamespace, serverSecretName)
+	secret, err := p.GetSecret(ctx, serverSecretNamespace, serverSecretName)
 	if err != nil {
 		return nil, err
 	}
@@ -340,9 +341,9 @@ func (p *freenasProvisioner) getAccessModes() []v1.PersistentVolumeAccessMode {
 	}
 }
 
-func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.PersistentVolume, error) {
+func (p *freenasProvisioner) Provision(ctx context.Context, options controller.ProvisionOptions) (*v1.PersistentVolume, controller.ProvisioningState, error) {
 	if !AccessModesContainedInAll(p.getAccessModes(), options.PVC.Spec.AccessModes) {
-		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.getAccessModes())
+		return nil, controller.ProvisioningFinished, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", options.PVC.Spec.AccessModes, p.getAccessModes())
 	}
 
 	var err error
@@ -352,23 +353,23 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	var loopResp *http.Response
 
 	// get config
-	config, err := p.GetConfig(*options.PVC.Spec.StorageClassName)
+	config, err := p.GetConfig(ctx, *options.PVC.Spec.StorageClassName)
 	if err != nil {
-		return nil, err
+		return nil, controller.ProvisioningFinished, err
 	}
 	//glog.Infof("%+v\n", config)
 
 	// get server
 	freenasServer, err := p.GetServer(*config)
 	if err != nil {
-		return nil, err
+		return nil, controller.ProvisioningFinished, err
 	}
 
 	// get iscsi configuration
 	iscsiConfig := freenas.ISCSIConfig{}
 	resp, err = iscsiConfig.Get(freenasServer)
 	if err != nil {
-		return nil, err
+		return nil, controller.ProvisioningFinished, err
 	}
 
 	// get parent dataset
@@ -377,7 +378,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	}
 	resp, err = parentDs.Get(freenasServer)
 	if err != nil {
-		return nil, err
+		return nil, controller.ProvisioningFinished, err
 	}
 
 	meta := options.PVC.GetObjectMeta()
@@ -391,11 +392,11 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 	extentDiskName := "zvol/" + parentDs.Pool + "/" + zvolName
 
 	if len(extentDiskName) > 63 {
-		return nil, fmt.Errorf("extent zvol name (%s) cannot be longer than 63 chars", extentDiskName)
+		return nil, controller.ProvisioningFinished, fmt.Errorf("extent zvol name (%s) cannot be longer than 63 chars", extentDiskName)
 	}
 
 	if len(zvolName) < 1 {
-		return nil, fmt.Errorf("zvol name cannot be empty")
+		return nil, controller.ProvisioningFinished, fmt.Errorf("zvol name cannot be empty")
 	}
 
 	glog.Infof("Creating target: \"%s\", zvol: \"%s/%s\", extent: \"%s\"", iscsiName, parentDs.Pool, zvolName, iscsiName)
@@ -424,7 +425,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 			glog.Infof("Zvol %s/%s already exists", parentDs.Pool, zvol.Name)
 			//zvol.Get(freenasServer)
 		} else {
-			return nil, err
+			return nil, controller.ProvisioningFinished, err
 		}
 	}
 
@@ -441,7 +442,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 			if config.ProvisionerRollbackPartialFailures {
 				zvol.Delete(freenasServer)
 			}
-			return nil, err
+			return nil, controller.ProvisioningFinished, err
 		}
 
 		target.Get(freenasServer)
@@ -467,7 +468,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 					target.Delete(freenasServer)
 					zvol.Delete(freenasServer)
 				}
-				return nil, err
+				return nil, controller.ProvisioningFinished, err
 			}
 		} else if resp.StatusCode != 409 {
 			glog.Infof("failed attempt to create TargetGroup %d", resp.StatusCode)
@@ -475,7 +476,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 				target.Delete(freenasServer)
 				zvol.Delete(freenasServer)
 			}
-			return nil, err
+			return nil, controller.ProvisioningFinished, err
 		}
 	}
 
@@ -511,7 +512,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 						target.Delete(freenasServer)
 						zvol.Delete(freenasServer)
 					}
-					return nil, err
+					return nil, controller.ProvisioningFinished, err
 				}
 				break
 			}
@@ -522,7 +523,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 					target.Delete(freenasServer)
 					zvol.Delete(freenasServer)
 				}
-				return nil, err
+				return nil, controller.ProvisioningFinished, err
 			}
 			extentLoopCurrent++
 			time.Sleep(extentWaitDuration)
@@ -550,7 +551,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 					target.Delete(freenasServer)
 					zvol.Delete(freenasServer)
 				}
-				return nil, err
+				return nil, controller.ProvisioningFinished, err
 			}
 		} else {
 			if config.ProvisionerRollbackPartialFailures {
@@ -559,7 +560,7 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 				target.Delete(freenasServer)
 				zvol.Delete(freenasServer)
 			}
-			return nil, err
+			return nil, controller.ProvisioningFinished, err
 		}
 	}
 
@@ -614,10 +615,10 @@ func (p *freenasProvisioner) Provision(options controller.VolumeOptions) (*v1.Pe
 		},
 	}
 
-	return pv, nil
+	return pv, controller.ProvisioningFinished, nil
 }
 
-func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
+func (p *freenasProvisioner) Delete(ctx context.Context, volume *v1.PersistentVolume) error {
 	var targetID, extentID int
 	var poolName, zvolName, iscsiName, datasetParentName string
 
@@ -660,7 +661,7 @@ func (p *freenasProvisioner) Delete(volume *v1.PersistentVolume) error {
 	var resp *http.Response
 
 	// get config
-	config, err := p.GetConfig(volume.Spec.StorageClassName)
+	config, err := p.GetConfig(ctx, volume.Spec.StorageClassName)
 	if err != nil {
 		return err
 	}
@@ -746,11 +747,11 @@ func (p *freenasProvisioner) GetServer(config freenasProvisionerConfig) (*freena
 	), nil
 }
 
-func (p *freenasProvisioner) GetSecret(namespace, secretName string) (*v1.Secret, error) {
+func (p *freenasProvisioner) GetSecret(ctx context.Context, namespace, secretName string) (*v1.Secret, error) {
 	if p.Client == nil {
 		return nil, fmt.Errorf("Cannot get kube client")
 	}
-	return p.Client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	return p.Client.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 }
 
 // BytesToString converts bytes to a string
