@@ -15,8 +15,8 @@
 
 *.swp
 *.swo
-bin/
-vendor/
-tmp/
-bin_release/
-manifests/
+/bin/
+/vendor/
+/tmp/
+/bin_release/
+/manifests/
