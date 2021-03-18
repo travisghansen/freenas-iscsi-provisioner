@@ -7,6 +7,10 @@ implementation - https://github.com/democratic-csi/democratic-csi
 The new implementation works with all the fancy `csi` features such as snapshots,
 resizing, etc. Enjoy!
 
+Note that a conversion script has been created to facilitate migrating volumes
+created using this project to `democratic-csi`. Please visit the project for
+more details.
+
 # What is freenas-provisioner
 
 FreeNAS-iscsi-provisioner is a Kubernetes external provisioner.
@@ -174,6 +178,11 @@ To format code before committing:
 ```
 make fmt
 ```
+
+- https://github.com/kubernetes-incubator/external-storage/blob/v4.0.0/lib/controller/controller.go
+- https://github.com/kubernetes-sigs/sig-storage-lib-external-provisioner/blob/master/controller/controller.go
+- https://gianarb.it/blog/kubernetes-shared-informer
+- https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html
 
 ## Docs
 
